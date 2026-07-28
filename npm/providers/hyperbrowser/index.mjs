@@ -1,0 +1,21 @@
+import cjs from './index.cjs';
+
+export const DEFAULT_API_BASE = cjs.DEFAULT_API_BASE;
+export const MAX_EXTENSION_BYTES = cjs.MAX_EXTENSION_BYTES;
+export const assertHyperbrowserExtensionArtifact = cjs.assertHyperbrowserExtensionArtifact;
+export const connectHyperbrowserPlaywright = cjs.connectHyperbrowserPlaywright;
+export const connectHyperbrowserPuppeteer = cjs.connectHyperbrowserPuppeteer;
+export const connectHyperbrowserSelenium = cjs.connectHyperbrowserSelenium;
+export const createHyperbrowserClient = cjs.createHyperbrowserClient;
+export const createHyperbrowserSeleniumDriver = cjs.createHyperbrowserSeleniumDriver;
+export const createHyperbrowserSessionWithExtension = cjs.createHyperbrowserSessionWithExtension;
+export const hyperbrowserCredentials = cjs.hyperbrowserCredentials;
+export const hyperbrowserHttpAgent = cjs.hyperbrowserHttpAgent;
+export const hyperbrowserResultsDir = cjs.hyperbrowserResultsDir;
+export const hyperbrowserSessionOptions = cjs.hyperbrowserSessionOptions;
+export const hyperbrowserValidationSummary = cjs.hyperbrowserValidationSummary;
+export const isHyperbrowserSeleniumReadinessError = cjs.isHyperbrowserSeleniumReadinessError;
+export const resolveHyperbrowserExtensionId = cjs.resolveHyperbrowserExtensionId;
+export const stopHyperbrowserSession = cjs.stopHyperbrowserSession;
+export const validateOnlyEnabled = cjs.validateOnlyEnabled;
+export default cjs;

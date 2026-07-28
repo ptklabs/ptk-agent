@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pentestkit.dev/schemas/agents/v2/module-pack.schema.json",
+  "title": "PTK Module Pack v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "id", "modules"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+    },
+    "displayName": {
+      "type": "string"
+    },
+    "source": {
+      "enum": ["bundled", "portal", "cache", "local"]
+    },
+    "signature": {
+      "type": ["string", "null"]
+    },
+    "sha256": {
+      "type": ["string", "null"],
+      "pattern": "^[a-fA-F0-9]{64}$"
+    },
+    "entitlement": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean"
+        },
+        "product": {
+          "type": "string"
+        }
+      }
+    },
+    "modules": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/module"
+      }
+    }
+  },
+  "$defs": {
+    "module": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "engine", "version", "capabilities"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+        },
+        "engine": {
+          "enum": ["dast", "sast", "iast", "sca"]
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "entry": {
+          "type": ["string", "null"]
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "policy": {
+          "type": "object",
+          "additionalProperties": true
+        }
+      }
+    }
+  }
+}

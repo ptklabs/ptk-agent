@@ -1,0 +1,127 @@
+{
+  "version": "ptk-scenario-v2",
+  "name": "BrokenCrystals deterministic benchmark scenario",
+  "description": "Explicit scenario DAG for authenticated browsing, API documentation, GraphQL, marketplace, and exposed configuration surfaces.",
+  "personas": ["shopper"],
+  "steps": [
+    {
+      "id": "login",
+      "type": "auth",
+      "persona": "shopper",
+      "target": {
+        "route": "/userlogin"
+      },
+      "success": {
+        "authState": "authenticated"
+      }
+    },
+    {
+      "id": "open-marketplace",
+      "type": "navigate",
+      "persona": "shopper",
+      "dependsOn": ["login"],
+      "target": {
+        "route": "/marketplace"
+      },
+      "success": {
+        "url": "/marketplace"
+      }
+    },
+    {
+      "id": "open-profile",
+      "type": "navigate",
+      "persona": "shopper",
+      "dependsOn": ["login"],
+      "target": {
+        "route": "/userprofile"
+      },
+      "success": {
+        "url": "/userprofile"
+      }
+    },
+    {
+      "id": "open-chat",
+      "type": "navigate",
+      "persona": "shopper",
+      "dependsOn": ["login"],
+      "target": {
+        "route": "/chat"
+      },
+      "success": {
+        "url": "/chat"
+      }
+    },
+    {
+      "id": "open-swagger",
+      "type": "navigate",
+      "persona": "shopper",
+      "dependsOn": ["open-marketplace"],
+      "target": {
+        "route": "/swagger"
+      },
+      "success": {
+        "url": "/swagger"
+      }
+    },
+    {
+      "id": "open-graphiql",
+      "type": "navigate",
+      "persona": "shopper",
+      "dependsOn": ["open-swagger"],
+      "target": {
+        "route": "/graphiql"
+      },
+      "success": {
+        "url": "/graphiql"
+      }
+    },
+    {
+      "id": "open-config",
+      "type": "navigate",
+      "persona": "shopper",
+      "dependsOn": ["open-graphiql"],
+      "target": {
+        "route": "/api/config"
+      },
+      "success": {
+        "url": "/api/config"
+      }
+    },
+    {
+      "id": "open-secrets",
+      "type": "navigate",
+      "persona": "shopper",
+      "dependsOn": ["open-config"],
+      "target": {
+        "route": "/api/secrets"
+      },
+      "success": {
+        "url": "/api/secrets"
+      }
+    },
+    {
+      "id": "search-products-api",
+      "type": "navigate",
+      "persona": "shopper",
+      "dependsOn": ["open-secrets"],
+      "target": {
+        "route": "/api/products/search?name=opal"
+      },
+      "success": {
+        "url": "/api/products/search"
+      }
+    },
+    {
+      "id": "open-hidden-upload",
+      "type": "navigate",
+      "persona": "shopper",
+      "dependsOn": ["search-products-api"],
+      "target": {
+        "route": "/hidden-upload"
+      },
+      "success": {
+        "url": "/hidden-upload"
+      }
+    }
+  ]
+}

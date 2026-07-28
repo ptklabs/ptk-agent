@@ -1,0 +1,7 @@
+{
+  "id": "crud-demo",
+  "target": "CRUD workflow demo app",
+  "modes": ["no-agent", "scenario", "agent-mock"],
+  "metrics": ["routeCoverage", "endpointCoverage", "scenarioCompletion", "workflowCompletion", "entityCoverage", "findings", "totalTime", "waitTime", "agentMissionValue"],
+  "agentValueRule": "agent delta must be measured against the no-agent baseline"
+}

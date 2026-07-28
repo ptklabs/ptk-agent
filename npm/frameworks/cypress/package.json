@@ -1,0 +1,36 @@
+{
+  "name": "ptk-cypress",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OWASP PTK security scanning plugin for Cypress — load the PTK browser extension into Cypress E2E tests and run DAST scans.",
+  "main": "src/index.js",
+  "scripts": {
+    "test": "node ./tests/run.js"
+  },
+  "files": [
+    "src/",
+    "tests/"
+  ],
+  "keywords": [
+    "cypress",
+    "cypress-plugin",
+    "security",
+    "dast",
+    "pentesting",
+    "owasp",
+    "ptk"
+  ],
+  "license": "AGPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ptklabs/ptk-agent.git",
+    "directory": "npm/frameworks/cypress"
+  },
+  "homepage": "https://github.com/ptklabs/ptk-agent#readme",
+  "bugs": {
+    "url": "https://github.com/ptklabs/ptk-agent/issues"
+  },
+  "peerDependencies": {
+    "cypress": ">=12.0.0"
+  }
+}

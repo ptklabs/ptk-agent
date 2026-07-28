@@ -1,0 +1,21 @@
+#!/usr/bin/env node
+'use strict';
+
+const { UsageError } = require('../src/cli/args.cjs');
+const { writeLine } = require('../src/cli/status.cjs');
+const { run } = require('../src/agent/mcpServer.cjs');
+
+run(process.argv.slice(2), {
+  cliName: 'ptk-agent-mcp-server',
+  cwd: process.cwd(),
+  io: {
+    stdout: process.stdout,
+    stderr: process.stderr
+  }
+}).then((exitCode) => {
+  process.exitCode = exitCode;
+}).catch((error) => {
+  const label = error instanceof UsageError ? 'Usage error' : 'Command failed';
+  writeLine(process.stderr, `${label}: ${error.message}`);
+  process.exitCode = error.exitCode || 70;
+});

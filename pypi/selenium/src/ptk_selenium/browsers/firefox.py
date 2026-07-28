@@ -1,0 +1,165 @@
+import json
+import os
+import sys
+from selenium import webdriver
+from selenium.webdriver.firefox.options import Options as FirefoxOptions
+from .base import BrowserLauncher
+
+
+DEFAULT_FIREFOX_EXTENSION_UUID = "7b4b556d-55d0-4db7-bf08-7c1ec1a0f5c5"
+
+
+class FirefoxLauncher(BrowserLauncher):
+    """
+    Firefox launcher with PTK extension support.
+
+    Supported installation modes (via install_mode parameter):
+
+    1. install_mode="temporary" (RECOMMENDED for development)
+       - Uses driver.install_addon(..., temporary=True)
+       - Works with unsigned extensions
+       - Extension removed when browser closes
+       - REQUIRES extension_xpi_path to be set (must be .xpi file!)
+
+    2. install_mode="profile" (for pre-installed signed XPI)
+       - Extension must already be installed in profile
+       - Requires signed XPI for Firefox Release
+       - Firefox Developer Edition can disable signing check
+
+    NOTE: Setting xpinstall.signatures.required=False via prefs
+    does NOT reliably work on Firefox Release. Don't count on it.
+
+    NOTE: driver.install_addon() requires a packaged .xpi file.
+    It does NOT work with unpacked folders like Chrome's "Load unpacked".
+    """
+
+    def __init__(
+        self,
+        profile_dir: str = None,
+        headless: bool = False,
+        install_mode: str = "temporary",
+        extension_xpi_path: str = None,
+        extra_args: list = None,
+        prefs: dict = None,
+        binary_location: str = None,
+    ):
+        if install_mode == "temporary" and not extension_xpi_path:
+            raise ValueError(
+                "extension_xpi_path is required for Firefox install_mode='temporary'. "
+                "Provide path to .xpi file, or use install_mode='profile' with pre-installed extension."
+            )
+
+        if install_mode == "profile" and extension_xpi_path:
+            import warnings
+
+            warnings.warn(
+                "extension_xpi_path is ignored when install_mode='profile'. "
+                "Extension must be pre-installed in the profile.",
+                UserWarning,
+            )
+
+        super().__init__(
+            profile_dir=profile_dir,
+            headless=headless,
+            install_mode=install_mode,
+            extension_xpi_path=extension_xpi_path,
+            extra_args=extra_args,
+            prefs=prefs,
+        )
+        self.binary_location = binary_location or self._detect_firefox_binary()
+
+    def _detect_firefox_binary(self) -> str:
+        """
+        Auto-detect Firefox binary in order of preference:
+        1. PTK_FIREFOX_BINARY env var
+        2. Firefox Developer Edition (recommended for unsigned addons)
+        3. Regular Firefox
+
+        NOTE: On macOS, we use firefox-bin (not firefox) to avoid
+        wrapper/helper behavior that can cause issues with WebDriver.
+        """
+        if env_binary := os.environ.get("PTK_FIREFOX_BINARY"):
+            return env_binary
+
+        candidates = []
+        if sys.platform == "darwin":
+            candidates = [
+                "/Applications/Firefox Developer Edition.app/Contents/MacOS/firefox-bin",
+                "/Applications/Firefox Developer Edition.app/Contents/MacOS/firefox",
+                "/Applications/Firefox.app/Contents/MacOS/firefox-bin",
+                "/Applications/Firefox.app/Contents/MacOS/firefox",
+            ]
+        elif sys.platform == "win32":
+            candidates = [
+                r"C:\Program Files\Firefox Developer Edition\firefox.exe",
+                r"C:\Program Files\Mozilla Firefox\firefox.exe",
+            ]
+        else:
+            candidates = [
+                "/usr/bin/firefox-developer-edition",
+                "/usr/bin/firefox",
+            ]
+
+        for path in candidates:
+            if os.path.exists(path):
+                return path
+
+        return "firefox"
+
+    def build_options(self) -> FirefoxOptions:
+        """
+        Build FirefoxOptions with:
+        - Profile directory (-profile argument)
+        - -no-remote flag (required for custom profiles)
+        - Stability prefs (disable telemetry, etc.)
+        """
+        options = FirefoxOptions()
+
+        if self.binary_location:
+            options.binary_location = self.binary_location
+
+        if self.profile_dir:
+            options.add_argument("-profile")
+            options.add_argument(self.profile_dir)
+            options.add_argument("-no-remote")
+
+        options.set_preference("browser.shell.checkDefaultBrowser", False)
+        options.set_preference("browser.startup.homepage_override.mstone", "ignore")
+        options.set_preference("browser.tabs.warnOnClose", False)
+        options.set_preference("toolkit.telemetry.reportingpolicy.firstRun", False)
+        options.set_preference("datareporting.policy.dataSubmissionEnabled", False)
+        options.set_preference("browser.reader.detectedFirstArticle", True)
+        options.set_preference("extensions.autoDisableScopes", 0)
+        options.set_preference("extensions.enabledScopes", 15)
+        options.set_preference("extensions.installDistroAddons", True)
+        options.set_preference("extensions.webextensions.restrictedDomains", "")
+        extension_uuid = os.environ.get(
+            "PTK_FIREFOX_EXTENSION_UUID",
+            DEFAULT_FIREFOX_EXTENSION_UUID,
+        )
+        options.set_preference("extensions.webextensions.uuids", json.dumps({
+            "pentestkit@DenisPodgurskii": extension_uuid,
+            "ptk-automation-agent@ptklabs.com": extension_uuid,
+        }))
+        options.set_preference("xpinstall.signatures.required", False)
+
+        for key, value in self.prefs.items():
+            options.set_preference(key, value)
+
+        if self.headless:
+            options.add_argument("-headless")
+
+        for arg in self.extra_args:
+            options.add_argument(arg)
+
+        return options
+
+    def launch(self) -> webdriver.Firefox:
+        """Launch Firefox and optionally install extension as temporary addon."""
+        options = self.build_options()
+        driver = webdriver.Firefox(options=options)
+
+        if self.install_mode == "temporary" and self.extension_xpi_path:
+            driver.install_addon(self.extension_xpi_path, temporary=True)
+
+        return driver

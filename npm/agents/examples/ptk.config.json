@@ -1,0 +1,160 @@
+{
+  "version": "ptk-agent-v2-config",
+  "target": {
+    "baseUrl": "http://localhost:3000",
+    "scope": {
+      "include": ["http://localhost:3000/**"],
+      "exclude": []
+    }
+  },
+  "crawler": {
+    "enabled": true,
+    "maxRoutes": 100,
+    "maxDepth": 5,
+    "maxRouteMs": 30000,
+    "maxActionMs": 1000,
+    "maxObservationMs": 800,
+    "maxActionsPerRoute": 3,
+    "maxFormsPerRoute": 1,
+    "maxNoProgressActions": 2,
+    "preserveSpaHashRoutes": true,
+    "salvageTimedOutRoutes": true,
+    "routeHints": [],
+    "routeHintsFile": null,
+    "forms": {
+      "enabled": true,
+      "allowSearch": true,
+      "allowContact": true,
+      "allowFeedback": true,
+      "allowAuth": false,
+      "allowBusinessMutation": false
+    },
+    "codeSignals": {
+      "enabled": false,
+      "mode": "off",
+      "maxScripts": 8,
+      "maxScriptBytes": 2000000,
+      "maxTotalBytes": 5000000,
+      "maxSignalMs": 500,
+      "seedRoutes": false,
+      "includeSourceMaps": false,
+      "includeExternalScripts": false
+    },
+    "surfaceExplorer": {
+      "enabled": true,
+      "maxExpansionsPerRoute": 5,
+      "maxNestedExpansions": 5,
+      "maxMenuActionsPerSurface": 8,
+      "maxRouteChangingMenuActions": 8,
+      "reopenSurfaceBetweenMenuActions": true,
+      "maxExpansionMs": 1000
+    },
+    "waitStrategy": "event-window"
+  },
+  "browserProbe": {
+    "enabled": true,
+    "maxNodes": 1500,
+    "maxControls": 300,
+    "maxRoutes": 500,
+    "maxTextChars": 8000,
+    "observeMutations": true,
+    "redactValues": true
+  },
+  "scenario": {
+    "enabled": false,
+    "file": null,
+    "continueOnFailure": false
+  },
+  "agent": {
+    "enabled": false,
+    "mode": "off",
+    "provider": "mock",
+    "model": null,
+    "maxTurns": 3,
+    "maxStepsPerTurn": 1,
+    "fallback": "fail",
+    "maxProviderMs": 60000,
+    "riskMode": "safe",
+    "allowBusinessMutations": false,
+    "allowDestructiveActions": false,
+    "requireSuccess": false
+  },
+  "profile": {
+    "file": null,
+    "activePersonaId": null,
+    "username": null,
+    "password": null,
+    "includeSecrets": false,
+    "credentials": {},
+    "values": {},
+    "personas": [],
+    "addresses": [],
+    "paymentMethods": [],
+    "businessEntities": [],
+    "searchTerms": [],
+    "uploadFixtures": [],
+    "workflowHints": []
+  },
+  "memory": {
+    "mode": "off",
+    "storageDir": ".ptk/site-memory",
+    "reset": false,
+    "staleAfterDays": 14,
+    "minConfidence": 0.25,
+    "maxSeedRoutes": 25
+  },
+  "engines": {
+    "dast": { "enabled": true, "modulePacks": ["free"] },
+    "iast": { "enabled": true, "modulePacks": ["free"] },
+    "sast": { "enabled": false, "modulePacks": ["free"] },
+    "sca": { "enabled": false, "modulePacks": [] }
+  },
+  "modules": {
+    "packs": ["free"],
+    "cacheDir": ".ptk/modules",
+    "verifySignatures": true,
+    "allowUnsigned": false,
+    "allowNetworkDownloads": false,
+    "portal": {
+      "baseUrl": null,
+      "tokenEnv": "PTK_PORTAL_TOKEN"
+    }
+  },
+  "browser": {
+    "name": "chromium",
+    "headless": true,
+    "executablePath": null,
+    "profileDir": null,
+    "firefoxXpi": null,
+    "launchTimeoutMs": 10000,
+    "viewport": {
+      "width": 1280,
+      "height": 800
+    }
+  },
+  "ptk": {
+    "enabled": true,
+    "extensionPath": null,
+    "autoDetectExtension": true,
+    "requireBridge": false,
+    "requireFindingsExport": false,
+    "allowMissing": true,
+    "exportDrainMs": 10000,
+    "drainMode": "off",
+    "drainTimeoutMs": 0,
+    "requireAttackCompletion": false,
+    "stopWaitForIdle": false,
+    "immediateAnalysis": true
+  },
+  "artifacts": {
+    "outputDir": ".ptk/artifacts",
+    "formats": ["json"]
+  },
+  "ci": {
+    "failOn": {
+      "severity": ["critical", "high"],
+      "confidence": ["confirmed", "high"]
+    },
+    "noFail": false
+  }
+}

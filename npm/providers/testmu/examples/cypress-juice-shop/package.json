@@ -1,0 +1,12 @@
+{
+  "name": "ptk-testmu-cypress-juice-shop",
+  "private": true,
+  "scripts": {
+    "testmu": "lambdatest-cypress run"
+  },
+  "devDependencies": {
+    "cypress": "^13.17.0",
+    "lambdatest-cypress-cli": "latest",
+    "pentestkit": "latest"
+  }
+}

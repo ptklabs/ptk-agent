@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pentestkit.dev/schemas/agents/v2/site-memory.schema.json",
+  "title": "PTK Agents SDK Site Memory",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "sdkVersion", "siteFingerprint", "routes", "selectors", "endpoints", "negativeMemory"],
+  "properties": {
+    "schemaVersion": { "const": "ptk-agent-v2-site-memory" },
+    "sdkVersion": { "type": "string" },
+    "siteFingerprint": {
+      "type": "object",
+      "required": ["schemaVersion", "siteKey", "origin"],
+      "properties": {
+        "schemaVersion": { "const": "ptk-agent-v2-site-fingerprint" },
+        "siteKey": { "type": "string" },
+        "origin": { "type": ["string", "null"] },
+        "baseUrl": { "type": ["string", "null"] },
+        "appBuildFingerprint": { "type": ["string", "null"] }
+      }
+    },
+    "routes": { "type": "array", "items": { "$ref": "#/$defs/memoryRecord" } },
+    "selectors": { "type": "array", "items": { "$ref": "#/$defs/memoryRecord" } },
+    "endpoints": { "type": "array", "items": { "$ref": "#/$defs/memoryRecord" } },
+    "negativeMemory": { "type": "array", "items": { "$ref": "#/$defs/memoryRecord" } }
+  },
+  "$defs": {
+    "memoryRecord": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["schemaVersion", "sdkVersion", "lastValidatedAt", "successCount", "failureCount", "confidence", "staleAfterDays"],
+      "properties": {
+        "schemaVersion": { "type": "string" },
+        "sdkVersion": { "type": "string" },
+        "lastValidatedAt": { "type": ["string", "null"] },
+        "successCount": { "type": "integer", "minimum": 0 },
+        "failureCount": { "type": "integer", "minimum": 0 },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "staleAfterDays": { "type": "number", "minimum": 1 }
+      }
+    }
+  }
+}

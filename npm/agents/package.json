@@ -1,0 +1,49 @@
+{
+  "name": "@pentestkit/agents",
+  "version": "0.0.0-v2",
+  "description": "PTK Agents SDK: deterministic crawler and PTK-backed scan CLI with scenarios, evidence, and optional agent manager surfaces.",
+  "type": "commonjs",
+  "private": true,
+  "files": [
+    "AGENTS.md",
+    "README.md",
+    "benchmarks/",
+    "bin/",
+    "docs/architecture.md",
+    "docs/ci-usage.md",
+    "docs/pro-modules.md",
+    "docs/ptk-automation-and-extension-loading.md",
+    "docs/scenario_demo.testfire.net.md",
+    "docs/scenario_juice_shop.md",
+    "docs/*.schema.json",
+    "examples/",
+    "runtime-skills/",
+    "src/"
+  ],
+  "bin": {
+    "ptk-agent": "bin/ptk-agent",
+    "ptk-scan": "bin/ptk-scan",
+    "ptk-agent-mcp-server": "bin/ptk-agent-mcp-server"
+  },
+  "scripts": {
+    "test": "node --test",
+    "test:cli-help": "node src/cli/index.cjs --help && node src/cli/index.cjs validate-config --help && node src/cli/index.cjs crawl --help && node src/cli/index.cjs scan --help && node src/cli/index.cjs compare --help && node src/cli/index.cjs modules --help && node src/cli/index.cjs benchmark --help && node bin/ptk-scan --help && node bin/ptk-agent-mcp-server --help",
+    "help": "node src/cli/index.cjs --help",
+    "validate:example": "node src/cli/index.cjs validate-config --config examples/ptk.config.json",
+    "dry-run": "node src/cli/index.cjs crawl --url http://localhost:3000 --dry-run"
+  },
+  "keywords": [
+    "ptk",
+    "crawler",
+    "security",
+    "dast",
+    "agents"
+  ],
+  "license": "AGPL-3.0-only",
+  "devDependencies": {
+    "jsdom": "^27.4.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

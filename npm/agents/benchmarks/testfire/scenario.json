@@ -1,0 +1,62 @@
+{
+  "version": "ptk-scenario-v2",
+  "name": "Altoro Mutual TestFire deterministic benchmark scenario",
+  "description": "Explicit scenario DAG for core authenticated banking workflows.",
+  "personas": ["bank-customer", "anonymous"],
+  "steps": [
+    {
+      "id": "login",
+      "type": "auth",
+      "persona": "bank-customer",
+      "target": {
+        "route": "/login.jsp"
+      },
+      "success": {
+        "authState": "authenticated"
+      }
+    },
+    {
+      "id": "account-summary",
+      "type": "navigate",
+      "persona": "bank-customer",
+      "dependsOn": ["login"],
+      "target": {
+        "route": "/bank/main.jsp"
+      },
+      "success": {
+        "url": "/bank/main.jsp"
+      }
+    },
+    {
+      "id": "transfer-funds",
+      "type": "transfer-funds",
+      "persona": "bank-customer",
+      "timeoutMs": 8000,
+      "dependsOn": ["account-summary"],
+      "value": {
+        "amountClass": "small",
+        "fromAccount": "first-available",
+        "toAccount": "different-available"
+      },
+      "target": {
+        "route": "/bank/transfer.jsp"
+      },
+      "success": {
+        "confirmationVisible": true
+      }
+    },
+    {
+      "id": "recent-transactions",
+      "type": "open-surface",
+      "persona": "bank-customer",
+      "dependsOn": ["transfer-funds"],
+      "surface": "transactions",
+      "target": {
+        "route": "/bank/transaction.jsp"
+      },
+      "success": {
+        "url": "/bank/transaction.jsp"
+      }
+    }
+  ]
+}

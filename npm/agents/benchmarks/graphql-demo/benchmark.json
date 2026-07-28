@@ -1,0 +1,7 @@
+{
+  "id": "graphql-demo",
+  "target": "GraphQL demo app",
+  "modes": ["no-agent", "scenario", "agent-mock"],
+  "metrics": ["routeCoverage", "endpointCoverage", "scenarioCompletion", "workflowCompletion", "graphqlOperationCoverage", "findings", "totalTime", "waitTime", "agentMissionValue"],
+  "agentValueRule": "agent delta must be measured against the no-agent baseline"
+}

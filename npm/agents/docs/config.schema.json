@@ -1,0 +1,424 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pentestkit.dev/schemas/agents/v2/config.schema.json",
+  "title": "PTK Agents SDK Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "target",
+    "crawler",
+    "browserProbe",
+    "scenario",
+    "agent",
+    "profile",
+    "memory",
+    "engines",
+    "modules",
+    "browser",
+    "ptk",
+    "artifacts",
+    "ci"
+  ],
+  "properties": {
+    "version": {
+      "const": "ptk-agent-v2-config"
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseUrl", "scope"],
+      "properties": {
+        "baseUrl": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https?://"
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["include", "exclude"],
+          "properties": {
+            "include": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "exclude": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    },
+    "crawler": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "maxRoutes",
+        "maxDepth",
+        "maxRouteMs",
+        "maxActionMs",
+        "maxObservationMs",
+        "maxActionsPerRoute",
+        "maxFormsPerRoute",
+        "maxNoProgressActions",
+        "preserveSpaHashRoutes",
+        "forms",
+        "codeSignals",
+        "surfaceExplorer",
+        "waitStrategy"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "maxRoutes": { "type": "integer", "minimum": 1, "default": 100 },
+        "maxDepth": { "type": "integer", "minimum": 0, "default": 5 },
+        "maxRouteMs": { "type": "integer", "minimum": 1, "default": 30000 },
+        "maxActionMs": { "type": "integer", "minimum": 1, "default": 1000 },
+        "maxObservationMs": { "type": "integer", "minimum": 1, "default": 800 },
+        "maxActionsPerRoute": { "type": "integer", "minimum": 0, "default": 3 },
+        "maxFormsPerRoute": { "type": "integer", "minimum": 0, "default": 1 },
+        "maxNoProgressActions": { "type": "integer", "minimum": 0, "default": 2 },
+        "preserveSpaHashRoutes": { "type": "boolean", "default": true },
+        "salvageTimedOutRoutes": {
+          "type": "boolean",
+          "default": true,
+          "description": "When a navigation times out after same-origin page commit, continue bounded page modeling instead of losing the route."
+        },
+        "routeHints": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "oneOf": [
+              { "type": "string", "minLength": 1 },
+              { "type": "object", "additionalProperties": true }
+            ]
+          },
+          "description": "Same-origin route or API surface hints to seed deterministic crawling."
+        },
+        "routeHintsFile": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "default": null,
+          "description": "JSON file containing route hints, routes, or analysis-shaped crawler evidence."
+        },
+        "forms": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["enabled", "allowSearch", "allowContact", "allowFeedback", "allowAuth", "allowBusinessMutation"],
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "allowSearch": { "type": "boolean", "default": true },
+            "allowContact": { "type": "boolean", "default": true },
+            "allowFeedback": { "type": "boolean", "default": true },
+            "allowAuth": { "type": "boolean", "default": false },
+            "allowBusinessMutation": { "type": "boolean", "default": false }
+          }
+        },
+        "codeSignals": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "mode",
+            "maxScripts",
+            "maxScriptBytes",
+            "maxTotalBytes",
+            "maxSignalMs",
+            "seedRoutes",
+            "includeSourceMaps",
+            "includeExternalScripts"
+          ],
+          "properties": {
+            "enabled": { "type": "boolean", "default": true },
+            "mode": { "type": "string", "enum": ["off", "safe", "wide"], "default": "off" },
+            "maxScripts": { "type": "integer", "minimum": 1, "default": 8 },
+            "maxScriptBytes": { "type": "integer", "minimum": 1, "default": 2000000 },
+            "maxTotalBytes": { "type": "integer", "minimum": 1, "default": 5000000 },
+            "maxSignalMs": { "type": "integer", "minimum": 1, "default": 500 },
+            "seedRoutes": { "type": "boolean", "default": false },
+            "includeSourceMaps": { "type": "boolean", "default": false },
+            "includeExternalScripts": { "type": "boolean", "default": false }
+          }
+        },
+        "surfaceExplorer": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "enabled",
+            "maxExpansionsPerRoute",
+            "maxNestedExpansions",
+            "maxMenuActionsPerSurface",
+            "maxRouteChangingMenuActions",
+            "reopenSurfaceBetweenMenuActions",
+            "maxExpansionMs"
+          ],
+          "properties": {
+            "enabled": { "type": "boolean", "default": false },
+            "maxExpansionsPerRoute": { "type": "integer", "minimum": 0, "default": 5 },
+            "maxNestedExpansions": { "type": "integer", "minimum": 0, "default": 5 },
+            "maxMenuActionsPerSurface": { "type": "integer", "minimum": 0, "default": 8 },
+            "maxRouteChangingMenuActions": { "type": "integer", "minimum": 0, "default": 8 },
+            "reopenSurfaceBetweenMenuActions": { "type": "boolean", "default": true },
+            "maxExpansionMs": { "type": "integer", "minimum": 1, "default": 1000 },
+            "maxSurfaceMs": { "type": ["integer", "null"], "minimum": 1, "default": null }
+          }
+        },
+        "waitStrategy": {
+          "type": "string",
+          "enum": ["event-window"],
+          "default": "event-window",
+          "description": "networkidle and unbounded sleeps are intentionally not default wait strategies."
+        }
+      }
+    },
+    "browserProbe": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "maxNodes", "maxControls", "maxRoutes", "maxTextChars", "observeMutations", "redactValues"],
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "maxNodes": { "type": "integer", "minimum": 1, "default": 1500 },
+        "maxControls": { "type": "integer", "minimum": 1, "default": 300 },
+        "maxRoutes": { "type": "integer", "minimum": 1, "default": 500 },
+        "maxTextChars": { "type": "integer", "minimum": 0, "default": 8000 },
+        "observeMutations": { "type": "boolean", "default": true },
+        "redactValues": { "type": "boolean", "default": true }
+      }
+    },
+    "scenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "file", "continueOnFailure"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "file": { "type": ["string", "null"], "minLength": 1 },
+        "continueOnFailure": { "type": "boolean", "default": false }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "mode",
+        "provider",
+        "model",
+        "maxTurns",
+        "maxStepsPerTurn",
+        "fallback",
+        "maxProviderMs",
+        "riskMode",
+        "allowBusinessMutations",
+        "allowDestructiveActions",
+        "requireSuccess"
+      ],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "mode": { "type": "string", "enum": ["off", "mock", "manager", "provider", "browser"] },
+        "provider": { "type": ["string", "null"] },
+        "model": { "type": ["string", "null"] },
+        "maxTurns": { "type": "integer", "minimum": 0 },
+        "maxStepsPerTurn": { "type": "integer", "minimum": 1, "default": 1 },
+        "maxProviderMs": { "type": "integer", "minimum": 1, "default": 60000 },
+        "riskMode": { "type": "string", "enum": ["safe", "business", "destructive"], "default": "safe" },
+        "allowBusinessMutations": { "type": "boolean", "default": false },
+        "allowDestructiveActions": { "type": "boolean", "default": false },
+        "requireSuccess": { "type": "boolean", "default": false },
+        "fallback": {
+          "type": "string",
+          "const": "fail",
+          "description": "The SDK fails explicitly instead of silently falling back."
+        }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "file",
+        "activePersonaId",
+        "username",
+        "password",
+        "includeSecrets",
+        "credentials",
+        "values",
+        "personas",
+        "addresses",
+        "paymentMethods",
+        "businessEntities",
+        "searchTerms",
+        "uploadFixtures",
+        "workflowHints"
+      ],
+      "properties": {
+        "file": { "type": ["string", "null"], "minLength": 1 },
+        "activePersonaId": { "type": ["string", "null"], "minLength": 1 },
+        "username": { "type": ["string", "null"] },
+        "password": { "type": ["string", "null"] },
+        "includeSecrets": { "type": "boolean" },
+        "credentials": { "type": "object", "additionalProperties": true },
+        "values": { "type": "object", "additionalProperties": true },
+        "personas": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+        "addresses": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+        "paymentMethods": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+        "businessEntities": { "type": "array", "items": { "type": "object", "additionalProperties": true } },
+        "searchTerms": { "type": "array", "items": { "type": ["string", "object"] } },
+        "uploadFixtures": { "type": "array", "items": { "type": ["string", "object"] } },
+        "workflowHints": { "type": "array", "items": { "type": "object", "additionalProperties": true } }
+      }
+    },
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "storageDir", "reset", "staleAfterDays", "minConfidence", "maxSeedRoutes"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["off", "read", "read-write"], "default": "off" },
+        "storageDir": { "type": "string", "minLength": 1, "default": ".ptk/site-memory" },
+        "reset": { "type": "boolean", "default": false },
+        "staleAfterDays": { "type": "integer", "minimum": 1, "default": 14 },
+        "minConfidence": { "type": "number", "minimum": 0, "maximum": 1, "default": 0.25 },
+        "maxSeedRoutes": { "type": "integer", "minimum": 0, "default": 25 }
+      }
+    },
+    "engines": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dast", "iast", "sast", "sca"],
+      "properties": {
+        "dast": { "$ref": "#/$defs/minimalEngine" },
+        "iast": { "$ref": "#/$defs/minimalEngine" },
+        "sast": { "$ref": "#/$defs/minimalEngine" },
+        "sca": { "$ref": "#/$defs/minimalEngine" }
+      },
+      "description": "Engine selection and per-engine module pack selection."
+    },
+    "modules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packs", "cacheDir", "verifySignatures", "allowUnsigned", "allowNetworkDownloads", "portal"],
+      "properties": {
+        "packs": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "uniqueItems": true,
+          "default": ["free"]
+        },
+        "cacheDir": { "type": "string", "minLength": 1, "default": ".ptk/modules" },
+        "verifySignatures": { "type": "boolean", "default": true },
+        "allowUnsigned": { "type": "boolean", "default": false },
+        "allowNetworkDownloads": { "type": "boolean", "default": false },
+        "portal": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["baseUrl", "tokenEnv"],
+          "properties": {
+            "baseUrl": { "type": ["string", "null"] },
+            "tokenEnv": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "browser": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "headless", "executablePath", "profileDir", "firefoxXpi", "launchTimeoutMs", "viewport"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "enum": ["chromium", "chrome", "edge", "firefox"],
+          "default": "chromium"
+        },
+        "headless": { "type": "boolean", "default": true },
+        "executablePath": { "type": ["string", "null"], "minLength": 1 },
+        "profileDir": { "type": ["string", "null"], "minLength": 1 },
+        "firefoxXpi": { "type": ["string", "null"], "minLength": 1 },
+        "launchTimeoutMs": { "type": "integer", "minimum": 1, "default": 10000 },
+        "viewport": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["width", "height"],
+          "properties": {
+            "width": { "type": "integer", "minimum": 1, "default": 1280 },
+            "height": { "type": "integer", "minimum": 1, "default": 800 }
+          }
+        }
+      }
+    },
+    "ptk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "extensionPath", "autoDetectExtension", "requireBridge", "requireFindingsExport", "allowMissing", "exportDrainMs", "drainMode", "drainTimeoutMs", "requireAttackCompletion", "stopWaitForIdle", "immediateAnalysis"],
+      "properties": {
+        "enabled": { "type": "boolean", "default": true },
+        "extensionPath": { "type": ["string", "null"], "minLength": 1 },
+        "autoDetectExtension": { "type": "boolean" },
+        "requireBridge": { "type": "boolean", "default": false },
+        "requireFindingsExport": { "type": "boolean", "default": false },
+        "allowMissing": { "type": "boolean", "default": true },
+        "exportDrainMs": { "type": "integer", "minimum": 0, "default": 10000 },
+        "drainMode": { "type": "string", "enum": ["off", "brief", "until-idle", "until-complete"], "default": "off" },
+        "drainTimeoutMs": { "type": "integer", "minimum": 0, "default": 0 },
+        "requireAttackCompletion": { "type": "boolean", "default": false },
+        "stopWaitForIdle": { "type": "boolean", "default": false },
+        "immediateAnalysis": { "type": "boolean", "default": true }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outputDir", "formats"],
+      "properties": {
+        "outputDir": { "type": "string", "minLength": 1, "default": ".ptk/artifacts" },
+        "formats": {
+          "type": "array",
+          "contains": { "const": "json" },
+          "items": { "type": "string", "enum": ["json", "jsonl"] },
+          "default": ["json"]
+        }
+      }
+    },
+    "ci": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["failOn", "noFail"],
+      "properties": {
+        "failOn": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["severity", "confidence"],
+          "properties": {
+            "severity": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["info", "low", "medium", "high", "critical"] },
+              "uniqueItems": true
+            },
+            "confidence": {
+              "type": "array",
+              "items": { "type": "string", "enum": ["low", "medium", "high", "confirmed"] },
+              "uniqueItems": true
+            }
+          }
+        },
+        "noFail": { "type": "boolean", "default": false }
+      }
+    }
+  },
+  "$defs": {
+    "minimalEngine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "modulePacks"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "modulePacks": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

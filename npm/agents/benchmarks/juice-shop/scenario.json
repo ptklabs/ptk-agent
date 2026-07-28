@@ -1,0 +1,87 @@
+{
+  "version": "ptk-scenario-v2",
+  "name": "OWASP Juice Shop deterministic benchmark scenario",
+  "description": "Explicit scenario DAG for core shopping and feedback workflows.",
+  "personas": ["shopper"],
+  "steps": [
+    {
+      "id": "login",
+      "type": "auth",
+      "persona": "shopper",
+      "timeoutMs": 10000,
+      "target": {
+        "route": "/#/login"
+      },
+      "postAuthProbes": [
+        "/rest/user/whoami",
+        "/profile"
+      ],
+      "success": {
+        "authState": "authenticated"
+      }
+    },
+    {
+      "id": "search-apple",
+      "type": "search",
+      "persona": "shopper",
+      "dependsOn": ["login"],
+      "value": "apple",
+      "target": {
+        "route": "/#/search"
+      },
+      "success": {
+        "text": "Apple"
+      }
+    },
+    {
+      "id": "add-apple-to-cart",
+      "type": "add-to-cart",
+      "persona": "shopper",
+      "timeoutMs": 8000,
+      "dependsOn": ["search-apple"],
+      "value": {
+        "quantity": 2,
+        "query": "apple"
+      },
+      "target": {
+        "surfaceType": "product-card"
+      },
+      "success": {
+        "cartCountAtLeast": 2
+      }
+    },
+    {
+      "id": "open-basket",
+      "type": "navigate",
+      "persona": "shopper",
+      "timeoutMs": 8000,
+      "dependsOn": ["add-apple-to-cart"],
+      "target": {
+        "route": "/#/basket"
+      },
+      "success": {
+        "url": "/#/basket"
+      }
+    },
+    {
+      "id": "submit-feedback",
+      "type": "submit-feedback",
+      "persona": "shopper",
+      "timeoutMs": 10000,
+      "dependsOn": ["open-basket"],
+      "value": {
+        "messageClass": "benign-feedback"
+      },
+      "target": {
+        "route": "/#/contact",
+        "form": "customer-feedback"
+      },
+      "retry": {
+        "maxAttempts": 3
+      },
+      "success": {
+        "confirmationVisible": true
+      }
+    }
+  ]
+}

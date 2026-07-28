@@ -1,0 +1,340 @@
+"""
+Browser launcher for PTK Playwright SDK.
+
+Provides persistent context launch with stable CI configuration.
+Supports Chromium-based browsers and Firefox.
+"""
+
+from pathlib import Path
+import json
+import os
+from typing import Tuple
+
+from playwright.sync_api import sync_playwright, BrowserContext, Page, Playwright
+
+from .config import PTKPlaywrightConfig
+
+
+class LaunchError(Exception):
+    """Failed to launch browser."""
+
+
+def launch_persistent_context(
+    config: PTKPlaywrightConfig,
+    profile_dir: str,
+) -> Tuple[Playwright, BrowserContext, Page]:
+    """
+    Launch browser with persistent context.
+
+    Supports Chromium-based browsers and Firefox with different extension
+    loading strategies:
+      - Chromium: extension loaded via --load-extension flag (extension_path required)
+      - Firefox: extension must be pre-installed in the profile as .xpi
+
+    Args:
+        config: PTK Playwright configuration
+        profile_dir: Path to browser profile directory
+
+    Returns:
+        Tuple of (Playwright instance, BrowserContext, Page)
+        Caller is responsible for cleanup: context.close(), playwright.stop()
+
+    Raises:
+        LaunchError: If browser fails to launch or profile is invalid
+        ValueError: If extension_path is not provided (Chromium only)
+    """
+    profile_path = Path(profile_dir).expanduser().resolve()
+
+    if not profile_path.exists():
+        raise LaunchError(
+            f"Profile directory not found: {profile_path}. "
+            "Create a profile with PTK installed first."
+        )
+
+    if config.is_firefox():
+        return _launch_firefox(config, profile_path)
+    else:
+        return _launch_chromium(config, profile_path)
+
+
+def _launch_chromium(
+    config: PTKPlaywrightConfig,
+    profile_path: Path,
+) -> Tuple[Playwright, BrowserContext, Page]:
+    """Launch Chromium-based browser (chromium, chrome, edge)."""
+    args = _build_chromium_args(config)
+    channel = config.get_channel()
+
+    pw = sync_playwright().start()
+
+    try:
+        launch_options = {
+            "user_data_dir": str(profile_path),
+            # Never use Playwright's built-in headless — it disables extensions.
+            # Instead we pass --headless=new via args (see _build_chromium_args).
+            "headless": False,
+            "args": args,
+            "viewport": {
+                "width": config.viewport_width,
+                "height": config.viewport_height,
+            },
+            "timeout": config.navigation_timeout * 1000,
+            "ignore_https_errors": True,
+            "accept_downloads": True,
+            # CRITICAL: Playwright adds --disable-extensions by default.
+            # We must exclude it so our --load-extension flag works.
+            "ignore_default_args": ["--disable-extensions"],
+        }
+
+        if config.executable_path:
+            launch_options["executable_path"] = str(
+                Path(config.executable_path).expanduser().resolve()
+            )
+        elif channel:
+            # Playwright treats channel and executable_path as alternative
+            # selectors. An explicit Chrome-for-Testing binary must not retain
+            # branded Chrome channel behavior.
+            launch_options["channel"] = channel
+
+        if config.slow_mo > 0:
+            launch_options["slow_mo"] = config.slow_mo
+
+        print(f"[PTK Debug] browser: {config.browser}")
+        print(f"[PTK Debug] channel: {channel}")
+        print(f"[PTK Debug] user_data_dir: {launch_options['user_data_dir']}")
+        print(f"[PTK Debug] executable: {config.executable_path or pw.chromium.executable_path}")
+        print(f"[PTK Debug] launch args: {args}")
+
+        context = pw.chromium.launch_persistent_context(**launch_options)
+
+        return _finish_launch(pw, context, config)
+
+    except Exception as e:
+        _cleanup_and_raise(pw, e, profile_path, "chromium")
+
+
+def _launch_firefox(
+    config: PTKPlaywrightConfig,
+    profile_path: Path,
+) -> Tuple[Playwright, BrowserContext, Page]:
+    """
+    Launch Firefox with persistent context.
+
+    Firefox extension loading:
+      - Extension must be pre-installed in the profile as .xpi
+      - No --load-extension flag needed (that's Chromium-only)
+      - Firefox headless mode supports extensions natively
+    """
+    pw = sync_playwright().start()
+
+    try:
+        launch_options = {
+            "user_data_dir": str(profile_path),
+            "headless": config.headless,
+            "viewport": {
+                "width": config.viewport_width,
+                "height": config.viewport_height,
+            },
+            "timeout": config.navigation_timeout * 1000,
+            "ignore_https_errors": True,
+            "accept_downloads": True,
+        }
+
+        if config.executable_path:
+            launch_options["executable_path"] = str(
+                Path(config.executable_path).expanduser().resolve()
+            )
+
+        if config.slow_mo > 0:
+            launch_options["slow_mo"] = config.slow_mo
+
+        # Firefox-specific args
+        args = _build_firefox_args(config)
+        if args:
+            launch_options["firefox_user_prefs"] = args
+
+        print(f"[PTK Debug] browser: firefox")
+        print(f"[PTK Debug] user_data_dir: {launch_options['user_data_dir']}")
+        print(f"[PTK Debug] executable: {config.executable_path or pw.firefox.executable_path}")
+        print(f"[PTK Debug] headless: {config.headless}")
+
+        context = pw.firefox.launch_persistent_context(**launch_options)
+
+        return _finish_launch(pw, context, config)
+
+    except Exception as e:
+        _cleanup_and_raise(pw, e, profile_path, "firefox")
+
+
+def _finish_launch(
+    pw: Playwright,
+    context: BrowserContext,
+    config: PTKPlaywrightConfig,
+) -> Tuple[Playwright, BrowserContext, Page]:
+    """Common post-launch setup: get page, set timeouts."""
+    browser_version = context.browser.version if context.browser else "unknown"
+    print(f"[PTK Debug] Running browser version: {browser_version}")
+
+    if context.pages:
+        page = context.pages[0]
+    else:
+        page = context.new_page()
+
+    page.set_default_navigation_timeout(config.navigation_timeout * 1000)
+    page.set_default_timeout(config.ready_timeout * 1000)
+
+    return pw, context, page
+
+
+def _cleanup_and_raise(
+    pw: Playwright,
+    error: Exception,
+    profile_path: Path,
+    browser_type: str,
+):
+    """Clean up Playwright on failure and raise descriptive error."""
+    try:
+        pw.stop()
+    except Exception:
+        pass
+
+    error_msg = str(error)
+
+    if "Target page, context or browser has been closed" in error_msg:
+        raise LaunchError(
+            f"Browser closed unexpectedly. Profile may be corrupted: {profile_path}"
+        ) from error
+
+    if "Failed to launch" in error_msg or "spawn" in error_msg.lower():
+        install_cmd = f"playwright install {browser_type}"
+        raise LaunchError(
+            f"Failed to launch {browser_type}. "
+            f"Run '{install_cmd}' or set PTK_EXECUTABLE_PATH. Error: {error_msg}"
+        ) from error
+
+    if "user data directory is already in use" in error_msg.lower():
+        raise LaunchError(
+            f"Profile is in use by another browser instance: {profile_path}. "
+            "Close the other browser or use a different profile."
+        ) from error
+
+    raise LaunchError(f"Browser launch failed: {error_msg}") from error
+
+
+def _build_chromium_args(config: PTKPlaywrightConfig) -> list:
+    """
+    Build Chromium launch arguments for stable CI execution.
+
+    These args disable various Chrome features that can cause instability
+    or unwanted behavior in automated testing.
+
+    IMPORTANT: Playwright disables extensions by default (--disable-extensions).
+    We use ignore_default_args=["--disable-extensions"] in launch options,
+    and must explicitly load extensions via --load-extension flag.
+    """
+    args = [
+        # Disable first-run UI and infobars
+        "--no-first-run",
+        "--no-default-browser-check",
+        "--disable-infobars",
+        # Match the Codex direct runner so Chrome-family browsers allow
+        # automation tooling to inspect and load the unpacked extension.
+        "--enable-unsafe-extension-debugging",
+        # Chromium only honors the last occurrence of --disable-features.
+        # Keep extension loading and Translate UI suppression in one switch.
+        "--disable-features=DisableLoadExtensionCommandLineSwitch,TranslateUI",
+        # Disable features that interfere with automation
+        "--disable-background-networking",
+        "--disable-background-timer-throttling",
+        "--disable-backgrounding-occluded-windows",
+        "--disable-breakpad",
+        "--disable-component-extensions-with-background-pages",
+        "--disable-component-update",
+        "--disable-default-apps",
+        "--disable-dev-shm-usage",
+        "--disable-extensions-file-access-check",
+        "--disable-hang-monitor",
+        "--disable-ipc-flooding-protection",
+        "--disable-popup-blocking",
+        "--disable-prompt-on-repost",
+        "--disable-renderer-backgrounding",
+        "--disable-sync",
+        # Performance optimizations for CI
+        "--metrics-recording-only",
+        "--no-pings",
+        # Reduce logging noise
+        "--log-level=3",
+        # Disable keychain access on macOS to avoid "userCanceledErr" errors
+        # This uses a mock keychain for cookie encryption instead of system keychain
+        "--use-mock-keychain",
+        # On Linux, use basic password store instead of gnome-keyring
+        "--password-store=basic",
+    ]
+
+    # Headless mode: use --headless=new (Chrome's new headless)
+    # The old --headless flag disables extensions entirely.
+    # --headless=new runs the full browser headlessly with extension support.
+    if config.headless:
+        args.extend([
+            "--headless=new",
+            "--disable-gpu",
+            "--hide-scrollbars",
+            "--mute-audio",
+        ])
+
+    # Extension loading - REQUIRED for Playwright
+    # Playwright disables extensions by default, so we must load explicitly via flags.
+    # This requires ignore_default_args=["--disable-extensions"] in launch options.
+    if config.extension_path:
+        ext_path = Path(config.extension_path).expanduser().resolve()
+        if not ext_path.exists():
+            raise ValueError(f"Extension path not found: {ext_path}")
+        # Load the extension
+        args.append(f"--load-extension={ext_path}")
+        # Only allow this extension (blocks others)
+        args.append(f"--disable-extensions-except={ext_path}")
+    else:
+        raise ValueError(
+            "extension_path is required for Playwright. "
+            "Playwright disables extensions by default, so the PTK extension "
+            "must be loaded explicitly via --load-extension flag. "
+            "Set PTK_EXTENSION_PATH or config.extension_path to the unpacked extension directory."
+        )
+
+    return args
+
+
+def _build_firefox_args(config: PTKPlaywrightConfig) -> dict:
+    """
+    Build Firefox user preferences for stable CI execution.
+
+    Firefox uses preferences (about:config) instead of command-line flags.
+    Returns a dict for firefox_user_prefs launch option.
+    """
+    extension_uuid = os.environ.get(
+        "PTK_FIREFOX_EXTENSION_UUID",
+        "7b4b556d-55d0-4db7-bf08-7c1ec1a0f5c5",
+    )
+    prefs = {
+        # Allow extensions to run (don't block sideloaded addons)
+        "extensions.autoDisableScopes": 0,
+        "extensions.enabledScopes": 15,
+        "extensions.installDistroAddons": True,
+        "extensions.webextensions.restrictedDomains": "",
+        "extensions.webextensions.uuids": json.dumps({
+            "pentestkit@DenisPodgurskii": extension_uuid,
+        }),
+        "xpinstall.signatures.required": False,
+        # Disable first-run pages
+        "browser.startup.homepage_override.mstone": "ignore",
+        "startup.homepage_welcome_url": "about:blank",
+        "startup.homepage_welcome_url.additional": "",
+        # Disable update checks
+        "app.update.enabled": False,
+        "app.update.auto": False,
+        # Disable telemetry
+        "toolkit.telemetry.reportingpolicy.firstRun": False,
+        "datareporting.policy.dataSubmissionEnabled": False,
+    }
+
+    return prefs

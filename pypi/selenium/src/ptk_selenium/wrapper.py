@@ -1,0 +1,120 @@
+from typing import Callable, Optional
+
+from ptk_core import PTKBridge, PtkScanOptions
+from ptk_core.lifecycle import with_ptk_scan as _with_ptk_scan
+
+
+class SeleniumDriverAdapter:
+    def __init__(self, driver, switch_to_default_content: bool = True):
+        self.driver = driver
+        self.switch_to_default_content = switch_to_default_content
+
+    def evaluate(self, function_source: str, arg=None):
+        if self.switch_to_default_content:
+            try:
+                self.driver.switch_to.default_content()
+            except Exception:
+                pass
+        return self.driver.execute_async_script(
+            """
+            const done = arguments[arguments.length - 1];
+            const arg = arguments[0];
+            Promise.resolve()
+              .then(() => (%s)(arg))
+              .then((value) => done({ ok: true, value }))
+              .catch((error) => done({
+                ok: false,
+                error: error && error.message ? error.message : String(error),
+                stack: error && error.stack ? error.stack : null
+              }));
+            """
+            % function_source,
+            arg,
+        )
+
+    def wait_for_timeout(self, ms: int):
+        try:
+            self.driver.implicitly_wait(0)
+        except Exception:
+            pass
+        import time
+
+        time.sleep(max(0, ms) / 1000)
+
+
+def _unwrap_selenium_result(value):
+    if isinstance(value, dict) and value.get("ok") is False:
+        raise RuntimeError(value.get("error") or "Selenium PTK evaluate failed")
+    if isinstance(value, dict) and value.get("ok") is True and "value" in value:
+        return value.get("value")
+    return value
+
+
+class SeleniumPtkBridge(PTKBridge):
+    def call(self, method: str, options=None):
+        return _unwrap_selenium_result(super().call(method, options))
+
+    def ping(self):
+        return _unwrap_selenium_result(super().ping())
+
+    def request_activation(self, reason: str = "ptk_python_selenium_wait_ready"):
+        return _unwrap_selenium_result(super().request_activation(reason))
+
+
+def create_ptk_bridge(driver, default_timeout: float = 30, activate: bool = True, switch_to_default_content: bool = True):
+    return SeleniumPtkBridge(
+        SeleniumDriverAdapter(driver, switch_to_default_content=switch_to_default_content),
+        default_timeout=default_timeout,
+        activate=activate,
+    )
+
+
+def wait_for_ptk(driver, timeout: float = 30, **options):
+    bridge = create_ptk_bridge(
+        driver,
+        default_timeout=timeout,
+        activate=options.pop("activate", True),
+        switch_to_default_content=options.pop("switch_to_default_content", True),
+    )
+    return bridge.wait_ready(timeout=timeout, **options)
+
+
+def with_ptk_scan(
+    driver,
+    run_journey: Callable,
+    project: Optional[str] = None,
+    engines=None,
+    policy_code: Optional[str] = None,
+    test_run_id: Optional[str] = None,
+    results_dir: Optional[str] = None,
+    findings_limit: int = 500,
+    findings_timeout: float = 0,
+    wait_timeout: float = 30,
+    stop_wait: bool = True,
+    immediate_analysis: Optional[bool] = None,
+    **options,
+):
+    bridge = options.pop("bridge", None) or create_ptk_bridge(driver, default_timeout=wait_timeout)
+    scan_options = PtkScanOptions(
+        project=project,
+        engines=engines or ["DAST"],
+        policy_code=policy_code,
+        test_run_id=test_run_id,
+        results_dir=results_dir,
+        findings_limit=findings_limit,
+        findings_timeout=findings_timeout,
+        wait_timeout=wait_timeout,
+        stop_wait=stop_wait,
+        immediate_analysis=immediate_analysis,
+        collect_before_stop=options.pop("collect_before_stop", True),
+        collect_after_stop=options.pop("collect_after_stop", False),
+        throw_on_error=options.pop("throw_on_error", True),
+        start_options=options.pop("start_options", {}),
+        stop_options=options.pop("stop_options", {}),
+    )
+    return _with_ptk_scan(
+        bridge,
+        scan_options,
+        run_journey,
+        context={"driver": driver},
+    )

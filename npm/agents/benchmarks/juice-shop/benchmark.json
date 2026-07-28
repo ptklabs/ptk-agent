@@ -1,0 +1,7 @@
+{
+  "id": "juice-shop",
+  "target": "OWASP Juice Shop",
+  "modes": ["no-agent", "scenario", "agent-mock"],
+  "metrics": ["routeCoverage", "endpointCoverage", "scenarioCompletion", "workflowCompletion", "findings", "totalTime", "waitTime", "agentMissionValue"],
+  "agentValueRule": "agent delta must be measured against the no-agent baseline"
+}

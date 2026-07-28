@@ -1,0 +1,1049 @@
+"""
+PTK Playwright Driver - High-level wrapper for PTK automation.
+
+Mirrors the API of PTKDriver from ptk-selenium for easy adoption.
+Uses bridge-based automation exclusively (no UI clicking).
+"""
+
+import base64
+import gzip
+import json
+import os
+import time
+import uuid
+from typing import Callable, Optional
+
+from playwright.sync_api import Page
+
+from .bridge import check_bridge_ready, validate_capabilities, wait_bridge_ready
+from .exceptions import (
+    PTKNotReadyError,
+    PTKAutomationDisabledError,
+    PTKSessionError,
+    PTKBridgeError,
+    PTKExportError,
+    PTKTimeoutError,
+)
+
+
+class PTKPlaywrightDriver:
+    """
+    High-level wrapper for PTK automation operations.
+
+    Uses bridge-based automation exclusively (no UI clicking).
+    API mirrors PTKDriver from ptk-selenium for consistency.
+
+    Example:
+        ptk = PTKPlaywrightDriver(page)
+        ptk.wait_ready()
+        ptk.start_session(project="my-app", engines=["DAST"])
+
+        # ... run test flow ...
+
+        result = ptk.end_session()
+    """
+
+    def __init__(self, page: Page, default_timeout: int = 30):
+        """
+        Initialize PTK Playwright driver.
+
+        Args:
+            page: Playwright Page instance
+            default_timeout: Default timeout in seconds for bridge operations
+        """
+        self.page = page
+        self.default_timeout = default_timeout
+        self._session_id = None
+        self._last_session_id = None
+        self._tab_id = None
+        self._bridge_info = None
+
+    def wait_ready(self, timeout: int = None) -> dict:
+        """
+        Wait until PTK automation bridge is available and validated.
+
+        Args:
+            timeout: Timeout in seconds (defaults to default_timeout)
+
+        Returns:
+            dict with bridge info (version, capabilities, etc.)
+
+        Raises:
+            PTKNotReadyError: If bridge not available within timeout
+            PTKAutomationDisabledError: If automation disabled
+            PTKBridgeError: If capabilities missing
+        """
+        timeout = timeout or self.default_timeout
+        self._bridge_info = wait_bridge_ready(self.page, timeout=timeout)
+        return self._bridge_info
+
+    def is_ready(self) -> bool:
+        """Check if PTK automation is available (non-blocking)."""
+        try:
+            info = check_bridge_ready(self.page, timeout=5)
+            return info.get("ok", False) and info.get("automationEnabled", True)
+        except Exception:
+            return False
+
+    @property
+    def bridge_version(self) -> Optional[str]:
+        """Bridge version from last handshake (informational only)."""
+        return self._bridge_info.get("version") if self._bridge_info else None
+
+    @property
+    def session_id(self) -> Optional[str]:
+        """Current session ID or None."""
+        return self._session_id
+
+    def start_session(
+        self,
+        project: str = None,
+        engines: list = None,
+        policy_code: str = None,
+        test_run_id: str = None,
+        timeout: int = 60,
+    ) -> dict:
+        """
+        Start a PTK scanning session.
+
+        Args:
+            project: Project identifier
+            engines: List of engines to enable (default: ["DAST"])
+            policy_code: Policy code to use
+            test_run_id: Optional test run identifier
+            timeout: Timeout in seconds
+
+        Returns:
+            dict with session info (sessionId, status, etc.)
+
+        Raises:
+            PTKSessionError: If session start fails
+        """
+        if not self._bridge_info:
+            self.wait_ready()
+
+        result = self._execute_async(
+            """
+            (options) => {
+                return window.PTK_AUTOMATION.startSession(options)
+                    .then(r => ({ ok: true, ...r }))
+                    .catch(e => ({ ok: false, error: e.message || String(e) }));
+            }
+            """,
+            {
+                "project": project,
+                "engines": engines or ["DAST"],
+                "policyCode": policy_code,
+                "testRunId": test_run_id,
+            },
+            timeout=timeout,
+        )
+
+        if not result.get("ok"):
+            raise PTKSessionError(f"Session start failed: {result.get('error')}")
+        if result.get("error"):
+            raise PTKSessionError(f"Session start failed: {result.get('error')}")
+        if result.get("status") == "error":
+            raise PTKSessionError(f"Session start failed: {result.get('error')}")
+
+        session_id = result.get("sessionId")
+        if not session_id:
+            status = str(result.get("status", "")).lower()
+            if status == "started":
+                # Some bridge builds report started without sessionId.
+                # Keep flow running; most bridge operations are not keyed by sessionId.
+                session_id = f"ptk-started-{int(time.time() * 1000)}"
+                result["sessionId"] = session_id
+            else:
+                raise PTKSessionError(f"Session start returned no sessionId: {result}")
+
+        self._session_id = session_id
+        self._last_session_id = session_id
+        if result.get("tabId") is not None:
+            self._tab_id = result.get("tabId")
+        return result
+
+    def end_session(
+        self,
+        include_findings: bool = False,
+        limit: int = 100,
+        wait: bool = True,
+        poll_interval: float = 2.0,
+        max_wait: int = 600,  # 10 minutes
+        stuck_threshold: int = 60,  # seconds without progress change
+        on_progress: Optional[Callable[[dict], None]] = None,
+        timeout: int = 30,  # Script timeout for stop request
+        immediate_analysis: Optional[bool] = None,
+    ) -> dict:
+        """
+        End the PTK session.
+
+        Args:
+            include_findings: Include findings in response (only if wait=True)
+            limit: Max findings to include
+            wait: If True, wait for completion. If False, return immediately.
+            poll_interval: Seconds between progress polls
+            max_wait: Maximum seconds to wait for completion
+            stuck_threshold: Seconds without progress before raising timeout
+            on_progress: Optional callback(progress_dict) called on each poll
+            timeout: Script timeout in seconds for stop request
+            immediate_analysis: If False, skip immediate post-stop analysis.
+                Defaults to PTK's normal automation behavior.
+
+        Returns:
+            dict with summary
+
+        Raises:
+            PTKTimeoutError: If max_wait exceeded or stuck detected
+            PTKSessionError: If session end fails
+        """
+        stop_timeout = max(10, int(timeout or 10))
+        capabilities = (self._bridge_info or {}).get("capabilities", [])
+        supports_progress = "getSessionProgress" in capabilities
+
+        def _normalize_stop_result(raw) -> dict:
+            if raw is None:
+                return {"ok": False, "error": "null_response"}
+
+            if isinstance(raw, dict):
+                result = dict(raw)
+                if "ok" not in result:
+                    if result.get("error"):
+                        result["ok"] = False
+                    elif any(
+                        key in result
+                        for key in ("status", "summary", "stats", "findings", "truncated")
+                    ):
+                        result["ok"] = True
+                    else:
+                        result["ok"] = False
+                        result["error"] = "empty_response"
+                return result
+
+            return {"ok": True, "data": raw}
+
+        def _request_stop(
+            request_timeout: int,
+            blocking_wait: bool,
+            include_findings_opt: bool,
+        ) -> dict:
+            stop_options = {
+                "wait": blocking_wait,
+                "includeFindings": include_findings_opt,
+                "limit": min(limit, 500),
+            }
+            if immediate_analysis is not None:
+                stop_options["immediateAnalysis"] = bool(immediate_analysis)
+            raw = self._execute_async(
+                """
+                (options) => {
+                    return window.PTK_AUTOMATION.endSession(options)
+                        .then(r => r)
+                        .catch(e => ({ ok: false, error: e.message || String(e) }));
+                }
+                """,
+                stop_options,
+                timeout=request_timeout,
+            )
+            return _normalize_stop_result(raw)
+
+        # Legacy bridge fallback: no progress API, use blocking endSession
+        if wait and not supports_progress:
+            legacy_timeout = max(stop_timeout, int(max_wait))
+            legacy_result = _request_stop(
+                request_timeout=legacy_timeout,
+                blocking_wait=True,
+                include_findings_opt=include_findings,
+            )
+
+            if not legacy_result.get("ok"):
+                error = legacy_result.get("error", "unknown")
+                raise PTKSessionError(
+                    f"Failed to stop session: {error} (payload={legacy_result})"
+                )
+
+            if legacy_result.get("status") == "error":
+                error = legacy_result.get("error", "Session ended with error")
+                raise PTKSessionError(error)
+
+            self._session_id = None
+            summary = legacy_result.get("summary")
+            if not isinstance(summary, dict):
+                summary = legacy_result
+            return {"ok": True, "summary": summary}
+
+        # Request stop (non-blocking, short timeout)
+        stop_result = _request_stop(
+            request_timeout=stop_timeout,
+            blocking_wait=False,
+            include_findings_opt=False,
+        )
+
+        if not stop_result.get("ok"):
+            error = stop_result.get("error", "unknown")
+            raise PTKSessionError(
+                f"Failed to stop session: {error} (payload={stop_result})"
+            )
+
+        if not wait:
+            return stop_result
+
+        if stop_result.get("status") == "completed":
+            self._session_id = None
+            summary = stop_result.get("summary")
+            if not isinstance(summary, dict):
+                summary = stop_result
+            return {"ok": True, "summary": summary}
+
+        if stop_result.get("status") == "error":
+            self._session_id = None
+            error = stop_result.get("error", "Session ended with error")
+            raise PTKSessionError(error)
+
+        # Poll for completion
+        start_time = time.time()
+        last_done = None
+        last_done_time = start_time
+
+        while True:
+            elapsed = time.time() - start_time
+
+            if elapsed > max_wait:
+                self._session_id = None
+                raise PTKTimeoutError(
+                    f"Session did not complete within {max_wait}s"
+                )
+
+            try:
+                progress = self.get_session_progress(timeout=10)
+            except Exception as e:
+                if on_progress:
+                    on_progress({"error": str(e)})
+                time.sleep(poll_interval)
+                continue
+
+            if on_progress:
+                on_progress(progress)
+
+            status = progress.get("status")
+
+            if status == "completed":
+                self._session_id = None
+                return {
+                    "ok": True,
+                    "summary": progress.get("finalSummary") or progress.get("summary"),
+                }
+
+            if status == "error":
+                self._session_id = None
+                error = progress.get("error", "Session ended with error")
+                raise PTKSessionError(error)
+
+            # Stuck detection
+            current_done = self._extract_done_count(progress)
+            if current_done is not None:
+                if current_done != last_done:
+                    last_done = current_done
+                    last_done_time = time.time()
+                elif time.time() - last_done_time > stuck_threshold:
+                    self._session_id = None
+                    raise PTKTimeoutError(
+                        f"Session appears stuck (no progress for {stuck_threshold}s)"
+                    )
+
+            time.sleep(poll_interval)
+
+    def get_session_progress(
+        self,
+        session_id: str = None,
+        timeout: int = 10,
+    ) -> dict:
+        """
+        Get session progress (fast, non-blocking).
+
+        Args:
+            session_id: Optional session ID (defaults to current/last)
+            timeout: Timeout in seconds
+
+        Returns:
+            dict with status, engines, summary, etc.
+
+        Raises:
+            PTKSessionError: If session not found
+        """
+        options = {"sessionId": session_id or self._session_id or self._last_session_id}
+        script = """
+        (options) => {
+            const bridge = window.PTK_AUTOMATION;
+            if (!bridge) {
+                return Promise.resolve({ ok: false, error: 'bridge_not_found' });
+            }
+            if (bridge._automationEnabled === false) {
+                return Promise.resolve({ ok: false, error: 'automation_disabled' });
+            }
+            if (typeof bridge.getSessionProgress !== 'function') {
+                return Promise.resolve({
+                    ok: false,
+                    error: 'capability_missing',
+                    capability: 'getSessionProgress'
+                });
+            }
+            return bridge.getSessionProgress(options)
+                .then(r => r)
+                .catch(e => ({ ok: false, error: e.message || String(e) }));
+        }
+        """
+        result = self._execute_async(script, options, timeout=timeout)
+        if result.get("error") in ("bridge_not_found", "automation_disabled"):
+            try:
+                self.wait_ready(timeout=max(1, min(int(timeout), 5)))
+                result = self._execute_async(script, options, timeout=timeout)
+            except (PTKNotReadyError, PTKAutomationDisabledError, PTKBridgeError):
+                pass
+
+        if not result.get("ok"):
+            error_code = result.get("error", "unknown")
+            if error_code == "session_not_found":
+                raise PTKSessionError("Session not found")
+
+        return result
+
+    def _extract_done_count(self, progress: dict) -> Optional[int]:
+        """Extract total done count from progress for stuck detection."""
+        engines = progress.get("engines", {})
+        total = 0
+        has_any = False
+        for eng_progress in engines.values():
+            done = eng_progress.get("progress", {}).get("done")
+            if done is not None:
+                total += done
+                has_any = True
+        return total if has_any else None
+
+    def get_stats(self, timeout: int = 30) -> dict:
+        """
+        Get current session statistics.
+
+        Args:
+            timeout: Timeout in seconds
+
+        Returns:
+            dict with findingsCount, bySeverity
+        """
+        if not self._session_id:
+            return {"findingsCount": 0, "bySeverity": {}}
+
+        result = self._execute_async(
+            """
+            () => {
+                return window.PTK_AUTOMATION.getStats()
+                    .then(r => ({ ok: true, ...r }))
+                    .catch(e => ({ ok: false, error: e.message || String(e) }));
+            }
+            """,
+            timeout=timeout,
+        )
+
+        if not result.get("ok"):
+            return {"findingsCount": 0, "bySeverity": {}}
+
+        return {
+            "findingsCount": result.get("findingsCount", 0),
+            "bySeverity": result.get("bySeverity", {}),
+        }
+
+    def get_findings(self, limit: int = 100, timeout: int = 30) -> dict:
+        """
+        Get session findings.
+
+        Args:
+            limit: Maximum number of findings to return
+            timeout: Timeout in seconds
+
+        Returns:
+            dict with findings list and truncated flag
+        """
+        if not self._session_id:
+            return {"findings": [], "truncated": False}
+
+        result = self._execute_async(
+            """
+            (limit) => {
+                return window.PTK_AUTOMATION.getFindings(limit)
+                    .then(r => ({ ok: true, ...r }))
+                    .catch(e => ({ ok: false, error: e.message || String(e) }));
+            }
+            """,
+            min(limit, 500),
+            timeout=timeout,
+        )
+
+        if not result.get("ok"):
+            return {"findings": [], "truncated": False}
+
+        return {
+            "findings": result.get("findings", []),
+            "truncated": result.get("truncated", False),
+        }
+
+    def get_analysis_snapshot(
+        self,
+        session_id: str = None,
+        timeout: int = 30,
+    ) -> dict:
+        """
+        Get the compact PTK analysis snapshot for the current or last session.
+
+        Args:
+            session_id: Optional explicit session id
+            timeout: Timeout in seconds
+
+        Returns:
+            Snapshot dict with per-engine counts/analysis where available
+        """
+        resolved_session_id = session_id or self._session_id or self._last_session_id
+        result = self._execute_async(
+            """
+            (options) => {
+                return window.PTK_AUTOMATION.getAnalysisSnapshot(options)
+                    .then(r => ({ ok: true, ...r }))
+                    .catch(e => ({ ok: false, error: e.message || String(e) }));
+            }
+            """,
+            {
+                "sessionId": resolved_session_id,
+                "sessionScope": "current-tab",
+            },
+            timeout=timeout,
+        )
+
+        if not result.get("ok"):
+            return {
+                "ok": False,
+                "error": result.get("error", "analysis_snapshot_unavailable"),
+            }
+
+        return result
+
+    def export_scan_payload(
+        self,
+        engine: str = "ALL",
+        session_id: str = None,
+        include_bodies: bool = True,
+        include_evidence: bool = True,
+        include_secrets: bool = False,
+        export_mode: str = "evidence",
+        sensitive: bool = False,
+        output_path: str = None,
+        max_export_bytes: int = 25 * 1024 * 1024,
+        timeout: int = 60,
+    ) -> dict:
+        """
+        Export scan payload (independent from end_session).
+
+        Can be called after end_session(); requires completed session.
+
+        Args:
+            engine: Engine to export ("DAST", "IAST", "SAST", "SCA", "ALL")
+            session_id: Optional session ID
+            include_bodies: Include request/response bodies
+            include_evidence: Include evidence data
+            include_secrets: Request replayable secret-bearing export (not available via page bridge)
+            export_mode: "evidence" (default) or "replayable"
+            sensitive: Must be True for replayable export
+            output_path: Required local path for privileged replayable export output
+            max_export_bytes: Maximum export size
+            timeout: Timeout in seconds
+
+        Returns:
+            dict with scans list
+
+        Raises:
+            PTKBridgeError: If exportScan not available
+            PTKExportError: If export fails
+        """
+        normalized_export_mode = str(export_mode or "evidence").lower()
+        if include_secrets and normalized_export_mode != "replayable":
+            raise PTKBridgeError("include_secrets_requires_replayable_export")
+        if normalized_export_mode == "replayable" and not include_secrets:
+            raise PTKBridgeError("replayable_export_requires_include_secrets")
+        if normalized_export_mode == "replayable" and not sensitive:
+            raise PTKBridgeError("replayable_export_requires_sensitive_true")
+        if sensitive and normalized_export_mode != "replayable":
+            raise PTKBridgeError("sensitive_export_requires_replayable_export")
+
+        if normalized_export_mode == "replayable":
+            return self._export_replayable_via_service_worker(
+                engine=engine,
+                session_id=session_id,
+                output_path=output_path,
+                timeout=timeout,
+            )
+
+        if self._bridge_info:
+            caps = self._bridge_info.get("capabilities", [])
+            if "exportScan" not in caps:
+                raise PTKBridgeError(
+                    "exportScan capability not available. "
+                    "Update PTK extension to use this feature."
+                )
+
+        resolved_session_id = session_id or self._session_id or self._last_session_id
+
+        result = self._execute_async(
+            """
+            (options) => {
+                return window.PTK_AUTOMATION.exportScan(options)
+                    .then(r => r)
+                    .catch(e => ({ ok: false, error: e.message || String(e) }));
+            }
+            """,
+            {
+                "engine": engine.upper(),
+                "sessionId": resolved_session_id,
+                "sessionScope": "current-tab",
+                "includeBodies": include_bodies,
+                "includeEvidence": include_evidence,
+                "includeSecrets": False,
+                "exportMode": "evidence",
+                "maxExportBytes": max_export_bytes,
+            },
+            timeout=timeout,
+        )
+
+        if not result.get("ok"):
+            error_code = result.get("error", "unknown")
+            warnings = result.get("warnings", [])
+
+            if error_code in PTKExportError.CODES:
+                raise PTKExportError(error_code, warnings)
+
+            return result
+
+        return self._materialize_evidence_export(
+            result,
+            session_id=resolved_session_id,
+            max_export_bytes=max_export_bytes,
+            timeout=timeout,
+        )
+
+    def _materialize_evidence_export(
+        self,
+        export_result: dict,
+        session_id: str = None,
+        max_export_bytes: int = 25 * 1024 * 1024,
+        timeout: int = 60,
+    ) -> dict:
+        """Resolve public page-bridge chunks into the normal inline scan contract."""
+        materialized = []
+        for descriptor in export_result.get("scans", []):
+            if not isinstance(descriptor, dict):
+                continue
+            if isinstance(descriptor.get("scan"), dict):
+                materialized.append(descriptor)
+                continue
+            if str(descriptor.get("exportMode") or "").lower() != "chunked":
+                materialized.append(descriptor)
+                continue
+
+            capabilities = set((self._bridge_info or {}).get("capabilities", []))
+            if "exportScanChunk" not in capabilities or "releaseExportScan" not in capabilities:
+                raise PTKBridgeError("chunked_export_capabilities_not_available")
+
+            export_id = descriptor.get("exportId")
+            chunk_count = int(descriptor.get("chunkCount") or 0)
+            if not export_id or chunk_count < 1:
+                raise PTKExportError("chunk_read_failed")
+            declared_size = int(descriptor.get("size") or 0)
+            if declared_size > max_export_bytes:
+                raise PTKExportError("export_too_large", export_result.get("warnings", []))
+
+            chunks = []
+            try:
+                for index in range(chunk_count):
+                    chunk_result = self._execute_async(
+                        """
+                        (options) => window.PTK_AUTOMATION.exportScanChunk(options)
+                            .then(r => r)
+                            .catch(e => ({ ok: false, error: e.message || String(e) }))
+                        """,
+                        {
+                            "engine": descriptor.get("engine"),
+                            "sessionId": session_id,
+                            "sessionScope": "current-tab",
+                            "exportId": export_id,
+                            "index": index,
+                        },
+                        timeout=timeout,
+                    )
+                    if not isinstance(chunk_result, dict) or not chunk_result.get("ok"):
+                        error = chunk_result.get("error", "chunk_read_failed") if isinstance(chunk_result, dict) else "chunk_read_failed"
+                        raise PTKExportError(error)
+                    try:
+                        chunks.append(base64.b64decode(chunk_result.get("chunkBase64", ""), validate=True))
+                    except Exception as exc:
+                        raise PTKExportError("chunk_decode_failed") from exc
+
+                encoded = b"".join(chunks)
+                if len(encoded) > max_export_bytes:
+                    raise PTKExportError("export_too_large", export_result.get("warnings", []))
+                compression = str(descriptor.get("compression") or "").lower()
+                if compression in {"gzip", "gz"}:
+                    encoded = gzip.decompress(encoded)
+                elif compression not in {"", "none", "null"}:
+                    raise PTKExportError("unsupported_export_compression")
+                payload = json.loads(encoded.decode("utf-8"))
+            finally:
+                self._execute_async(
+                    """
+                    (options) => window.PTK_AUTOMATION.releaseExportScan(options)
+                        .then(r => r)
+                        .catch(e => ({ ok: false, error: e.message || String(e) }))
+                    """,
+                    {
+                        "engine": descriptor.get("engine"),
+                        "sessionId": session_id,
+                        "sessionScope": "current-tab",
+                        "exportId": export_id,
+                    },
+                    timeout=timeout,
+                )
+
+            engine_parts = (
+                payload.get("export", {}).get("engineParts", {})
+                if isinstance(payload, dict)
+                else {}
+            )
+            if isinstance(engine_parts, dict) and engine_parts:
+                for engine, scan in engine_parts.items():
+                    if not isinstance(scan, dict):
+                        continue
+                    materialized.append({
+                        "engine": str(engine).upper(),
+                        "scan": scan,
+                        "privacy": descriptor.get("privacy", {}),
+                    })
+            else:
+                materialized.append({
+                    **descriptor,
+                    "scan": payload,
+                })
+
+        return {
+            **export_result,
+            "scans": materialized,
+        }
+
+    def _get_context_service_workers(self):
+        context = getattr(self.page, "context", None)
+        if context is None:
+            return []
+        workers = getattr(context, "service_workers", [])
+        if callable(workers):
+            try:
+                workers = workers()
+            except TypeError:
+                workers = []
+        return list(workers or [])
+
+    def _find_ptk_service_worker(self, timeout: int = 10):
+        context = getattr(self.page, "context", None)
+        if context is None:
+            return None
+
+        def is_candidate(worker) -> bool:
+            url = str(getattr(worker, "url", "") or "")
+            if not url.startswith("chrome-extension://") or not url.endswith("/app.js"):
+                return False
+            try:
+                return bool(worker.evaluate("() => typeof globalThis.PTK_PRIVILEGED_REPLAYABLE_EXPORT === 'function'"))
+            except Exception:
+                return False
+
+        for worker in self._get_context_service_workers():
+            if is_candidate(worker):
+                return worker
+
+        wait_for_event = getattr(context, "wait_for_event", None)
+        if callable(wait_for_event):
+            try:
+                worker = wait_for_event("serviceworker", timeout=max(1000, int(timeout * 1000)))
+                if is_candidate(worker):
+                    return worker
+            except Exception:
+                pass
+
+        for worker in self._get_context_service_workers():
+            if is_candidate(worker):
+                return worker
+        return None
+
+    def _service_worker_call(self, worker, function_name: str, request: dict, timeout: int = 60) -> dict:
+        try:
+            result = worker.evaluate(
+                """
+                async ({ functionName, request }) => {
+                    const fn = globalThis[functionName];
+                    if (typeof fn !== 'function') {
+                        return { ok: false, error: 'privileged_export_transport_unavailable' };
+                    }
+                    try {
+                        return await fn(request);
+                    } catch (err) {
+                        return { ok: false, error: err && err.message ? err.message : String(err) };
+                    }
+                }
+                """,
+                {
+                    "functionName": function_name,
+                    "request": request,
+                },
+            )
+            if result is None:
+                return {"ok": False, "error": "null_response"}
+            if isinstance(result, dict):
+                return result
+            return {"ok": True, "data": result}
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+    def _write_sensitive_json(self, output_path: str, payload: dict) -> None:
+        parent = os.path.dirname(os.path.abspath(output_path))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+        flags = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+        fd = os.open(output_path, flags, 0o600)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, indent=2, sort_keys=True)
+                handle.write("\n")
+        except Exception:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+            raise
+
+    def _export_replayable_via_service_worker(
+        self,
+        engine: str = "ALL",
+        session_id: str = None,
+        output_path: str = None,
+        timeout: int = 60,
+    ) -> dict:
+        if not output_path:
+            raise PTKBridgeError("replayable_export_requires_output_path")
+
+        resolved_session_id = session_id or self._session_id or self._last_session_id
+        if not resolved_session_id:
+            raise PTKBridgeError("session_id_required")
+        if self._tab_id is None:
+            raise PTKBridgeError("original_scan_tab_required")
+
+        worker = self._find_ptk_service_worker(timeout=min(timeout, 10))
+        if worker is None:
+            raise PTKBridgeError("replayable_export_requires_privileged_extension_export")
+
+        sdk_run_id = f"playwright-{uuid.uuid4()}"
+        export_request = {
+            "requestId": str(uuid.uuid4()),
+            "sessionId": resolved_session_id,
+            "originalScanTabId": self._tab_id,
+            "engine": str(engine or "ALL").upper(),
+            "exportMode": "replayable",
+            "includeSecrets": True,
+            "sensitive": True,
+            "nonce": str(uuid.uuid4()),
+            "transport": "service-worker",
+            "sdk": "playwright",
+            "sdkRunId": sdk_run_id,
+            "createdAt": int(time.time() * 1000),
+        }
+
+        export_result = self._service_worker_call(
+            worker,
+            "PTK_PRIVILEGED_REPLAYABLE_EXPORT",
+            export_request,
+            timeout=timeout,
+        )
+        if not export_result.get("ok"):
+            raise PTKExportError(export_result.get("error", "no_exportable_results"), export_result.get("warnings", []))
+
+        scans = []
+        try:
+            for descriptor in export_result.get("scans", []):
+                chunks = []
+                for index in range(int(descriptor.get("chunkCount", 0))):
+                    chunk_request = {
+                        "requestId": str(uuid.uuid4()),
+                        "sessionId": resolved_session_id,
+                        "originalScanTabId": self._tab_id,
+                        "engine": descriptor.get("engine"),
+                        "exportMode": "replayable",
+                        "includeSecrets": True,
+                        "sensitive": True,
+                        "transport": "service-worker",
+                        "sdk": "playwright",
+                        "sdkRunId": sdk_run_id,
+                        "leaseId": export_result.get("leaseId"),
+                        "exportId": descriptor.get("exportId"),
+                        "index": index,
+                    }
+                    chunk_result = self._service_worker_call(
+                        worker,
+                        "PTK_PRIVILEGED_REPLAYABLE_EXPORT_CHUNK",
+                        chunk_request,
+                        timeout=timeout,
+                    )
+                    if not chunk_result.get("ok"):
+                        raise PTKExportError(chunk_result.get("error", "chunk_read_failed"))
+                    chunks.append(base64.b64decode(chunk_result.get("chunkBase64", "")))
+
+                compressed = b"".join(chunks)
+                scan_payload = json.loads(gzip.decompress(compressed).decode("utf-8"))
+                scans.append({
+                    "engine": descriptor.get("engine"),
+                    "scan": scan_payload,
+                    "privacy": descriptor.get("privacy", {}),
+                })
+        finally:
+            release_request = {
+                "requestId": str(uuid.uuid4()),
+                "sessionId": resolved_session_id,
+                "originalScanTabId": self._tab_id,
+                "engine": "ALL",
+                "exportMode": "replayable",
+                "includeSecrets": True,
+                "sensitive": True,
+                "transport": "service-worker",
+                "sdk": "playwright",
+                "sdkRunId": sdk_run_id,
+                "leaseId": export_result.get("leaseId"),
+            }
+            self._service_worker_call(
+                worker,
+                "PTK_PRIVILEGED_REPLAYABLE_EXPORT_RELEASE",
+                release_request,
+                timeout=timeout,
+            )
+
+        payload = {
+            "ok": True,
+            "schemaVersion": "ptk-replayable-export-v1",
+            "exportMode": "replayable",
+            "sensitive": True,
+            "sessionId": resolved_session_id,
+            "originalScanTabId": self._tab_id,
+            "sdkRunId": sdk_run_id,
+            "privacy": {
+                "exportMode": "replayable",
+                "secretsIncluded": True,
+                "replayableRequests": True,
+                "sensitiveArtifact": True,
+            },
+            "scans": scans,
+            "warnings": export_result.get("warnings", []),
+        }
+        self._write_sensitive_json(output_path, payload)
+        return {
+            "ok": True,
+            "exportMode": "replayable",
+            "sensitive": True,
+            "secretsIncluded": True,
+            "outputPath": output_path,
+            "sessionId": resolved_session_id,
+            "originalScanTabId": self._tab_id,
+            "scanCount": len(scans),
+            "warnings": export_result.get("warnings", []),
+            "privacy": payload["privacy"],
+        }
+
+    @staticmethod
+    def get_scan(export_result: dict, engine: str = None) -> Optional[dict]:
+        """
+        Helper to extract a single scan from export result.
+
+        Args:
+            export_result: Result from export_scan_payload()
+            engine: Optional engine filter
+
+        Returns:
+            Scan dict or None
+        """
+        scans = export_result.get("scans", [])
+        if not scans:
+            return None
+
+        if engine:
+            engine_upper = engine.upper()
+            for scan in scans:
+                if scan.get("engine") == engine_upper:
+                    return scan.get("scan")
+            return None
+
+        if len(scans) == 1:
+            return scans[0].get("scan")
+
+        return None
+
+    def _execute_async(self, script: str, *args, timeout: int = None) -> dict:
+        """
+        Execute async JavaScript against PTK_AUTOMATION.
+
+        Args:
+            script: JavaScript function to execute
+            *args: Arguments to pass to the function
+            timeout: Timeout in seconds (best-effort, enforced in JS)
+
+        Returns:
+            Result dict from JavaScript
+        """
+        timeout = timeout or self.default_timeout
+
+        try:
+            # Playwright evaluate() doesn't support timeouts; enforce in JS.
+            payload = {
+                "args": [] if not args else [args[0]],
+                "timeoutMs": int(timeout * 1000),
+            }
+            wrapper = """
+            async (payload) => {
+                const fn = __PTK_SCRIPT__;
+                const args = payload.args || [];
+                const timeoutMs = payload.timeoutMs;
+
+                const run = () => Promise.resolve()
+                    .then(() => fn(...args))
+                    .catch((e) => ({
+                        __ptk_error__: true,
+                        error: e?.message || String(e) || 'evaluate_failed'
+                    }));
+                if (!timeoutMs || timeoutMs <= 0) {
+                    return await run();
+                }
+
+                const timeoutPromise = new Promise((resolve) =>
+                    setTimeout(() => resolve({ __ptk_timeout__: true }), timeoutMs)
+                );
+
+                const result = await Promise.race([run(), timeoutPromise]);
+                if (result && result.__ptk_timeout__) {
+                    return { ok: false, error: "timeout" };
+                }
+                if (result && result.__ptk_error__) {
+                    return { ok: false, error: result.error || "evaluate_failed" };
+                }
+                return result;
+            }
+            """
+            wrapped_script = wrapper.replace("__PTK_SCRIPT__", script.strip())
+            result = self.page.evaluate(wrapped_script, payload)
+
+            if result is None:
+                return {"ok": False, "error": "null_response"}
+            if isinstance(result, dict):
+                return result
+            return {"ok": True, "data": result}
+
+        except Exception as e:
+            return {"ok": False, "error": str(e)}

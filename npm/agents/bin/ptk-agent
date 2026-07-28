@@ -1,0 +1,14 @@
+#!/usr/bin/env node
+'use strict';
+
+require('../src/cli/index.cjs').main()
+  .then((exitCode) => {
+    process.exitCode = exitCode;
+  })
+  .catch((error) => {
+    const { UsageError } = require('../src/cli/args.cjs');
+    const { writeLine } = require('../src/cli/status.cjs');
+    const label = error instanceof UsageError ? 'Usage error' : 'Command failed';
+    writeLine(process.stderr, `${label}: ${error.message}`);
+    process.exitCode = error.exitCode || 70;
+  });

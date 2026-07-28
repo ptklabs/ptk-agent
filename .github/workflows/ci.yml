@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    name: npm / Node ${{ matrix.node }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [20, 24]
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+          package-manager-cache: false
+
+      - name: Install npm workspace dependencies
+        run: npm ci --ignore-scripts --prefix npm
+
+      - name: Install Agent test dependencies
+        run: npm ci --ignore-scripts --prefix npm/agents
+
+      - name: Audit repository and run Agent tests
+        run: npm --prefix npm run test:ci
+
+      - name: Check release scripts
+        run: |
+          node --check npm/scripts/audit-repository.cjs
+          node --check npm/scripts/prepare-npm-package.cjs
+          node --check npm/scripts/verify-extension-artifacts.cjs
+          node --check npm/scripts/verify-release-intent.cjs
+

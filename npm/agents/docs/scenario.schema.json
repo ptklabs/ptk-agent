@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pentestkit.dev/schemas/agents/v2/scenario.schema.json",
+  "title": "PTK Scenario v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "steps"],
+  "properties": {
+    "version": {
+      "const": "ptk-scenario-v2"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "personas": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    }
+  },
+  "$defs": {
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "type", "success"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:-]+$"
+        },
+        "type": {
+          "enum": [
+            "auth",
+            "navigate",
+            "search",
+            "open-surface",
+            "click-action",
+            "add-to-cart",
+            "submit-feedback",
+            "transfer-funds",
+            "submit-form",
+            "create-record",
+            "edit-record",
+            "upload-file",
+            "cart-add",
+            "checkout-advance",
+            "assert-state"
+          ]
+        },
+        "persona": {
+          "type": "string",
+          "minLength": 1
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._:-]+$"
+          },
+          "uniqueItems": true
+        },
+        "value": true,
+        "surface": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action": {
+          "type": ["string", "object"]
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "fromAccount": {
+          "type": "string",
+          "minLength": 1
+        },
+        "toAccount": {
+          "type": "string",
+          "minLength": 1
+        },
+        "amount": {
+          "type": ["string", "number"]
+        },
+        "failureBehavior": {
+          "enum": ["fail", "continue", "defer"]
+        },
+        "target": {
+          "type": ["string", "object", "null"]
+        },
+        "success": {
+          "$ref": "#/$defs/condition"
+        },
+        "failure": {
+          "$ref": "#/$defs/condition"
+        },
+        "retry": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "maxAttempts": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 5,
+              "default": 0
+            },
+            "strategy": {
+              "enum": ["none", "same-step", "changed-data-class"],
+              "default": "none"
+            }
+          }
+        },
+        "timeoutMs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30000
+        }
+      }
+    },
+    "condition": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": ["string", "number", "boolean", "object", "array", "null"]
+      },
+      "properties": {
+        "url": {
+          "type": "string"
+        },
+        "routeShape": {
+          "type": "string"
+        },
+        "surfaceType": {
+          "type": "string"
+        },
+        "authState": {
+          "enum": ["anonymous", "authenticated", "unknown"]
+        },
+        "selector": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "confirmationVisible": {
+          "type": "boolean"
+        },
+        "cartCountAtLeast": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

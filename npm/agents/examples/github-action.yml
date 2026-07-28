@@ -1,0 +1,21 @@
+name: PTK Agents v2
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ptk-agent-v2:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: npm/agents
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run test:cli-help
+      - run: npm test
+      - run: node src/cli/index.cjs validate-config --config examples/ptk.config.json
+      - run: npm pack --dry-run

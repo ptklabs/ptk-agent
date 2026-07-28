@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pentestkit.dev/schemas/agents/v2/ptk-findings-count.schema.json",
+  "title": "PTK Agents SDK Findings Count Artifact",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "source",
+    "findingsCount",
+    "bySeverity",
+    "byEngine",
+    "truncated",
+    "samples"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "ptk-agent-v2-findings-count" },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "source": { "type": "string", "minLength": 1 },
+    "findingsCount": { "type": "integer", "minimum": 0 },
+    "bySeverity": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "byEngine": {
+      "type": "object",
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "truncated": { "type": "boolean" },
+    "samples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["id", "engine", "title", "severity"],
+        "properties": {
+          "id": { "type": "string" },
+          "engine": { "type": "string" },
+          "title": { "type": "string" },
+          "severity": { "type": "string" },
+          "url": { "type": ["string", "null"] },
+          "method": { "type": ["string", "null"] },
+          "parameter": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "bridge": { "type": ["object", "null"] },
+    "status": { "type": ["object", "null"] },
+    "export": { "type": ["object", "null"] }
+  }
+}

@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pentestkit.dev/schemas/agents/v2/crawl-data.schema.json",
+  "title": "PTK Agents SDK Crawl Data",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "version": { "type": "string" },
+    "activePersonaId": { "type": ["string", "null"] },
+    "personas": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/persona" }
+    },
+    "credentials": { "type": "object", "additionalProperties": true },
+    "profile": { "type": "object", "additionalProperties": true },
+    "addresses": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "paymentMethods": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "businessEntities": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "searchTerms": {
+      "type": "array",
+      "items": { "type": ["string", "object"] }
+    },
+    "uploadFixtures": {
+      "type": "array",
+      "items": { "type": ["string", "object"] }
+    },
+    "workflowHints": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    }
+  },
+  "$defs": {
+    "persona": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "name": { "type": "string" },
+        "role": { "type": ["string", "null"] },
+        "credentials": { "type": "object", "additionalProperties": true },
+        "profile": { "type": "object", "additionalProperties": true },
+        "values": { "type": "object", "additionalProperties": true },
+        "addresses": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        },
+        "paymentMethods": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        },
+        "businessEntities": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        },
+        "searchTerms": {
+          "type": "array",
+          "items": { "type": ["string", "object"] }
+        },
+        "uploadFixtures": {
+          "type": "array",
+          "items": { "type": ["string", "object"] }
+        },
+        "workflowHints": {
+          "type": "array",
+          "items": { "type": "object", "additionalProperties": true }
+        }
+      }
+    }
+  }
+}

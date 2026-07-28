@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pentestkit.dev/schemas/agents/v2/engine-config.schema.json",
+  "title": "PTK Engine Config v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "engines", "modules"],
+  "properties": {
+    "version": {
+      "const": "ptk-engine-config-v2"
+    },
+    "engines": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "dast": {
+          "$ref": "#/$defs/engine"
+        },
+        "sast": {
+          "$ref": "#/$defs/engine"
+        },
+        "iast": {
+          "$ref": "#/$defs/engine"
+        },
+        "sca": {
+          "$ref": "#/$defs/engine"
+        }
+      },
+      "minProperties": 1
+    },
+    "modules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packs", "cacheDir", "verifySignatures", "allowNetworkDownloads", "portal"],
+      "properties": {
+        "packs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+          },
+          "uniqueItems": true
+        },
+        "cacheDir": {
+          "type": "string",
+          "minLength": 1
+        },
+        "verifySignatures": {
+          "type": "boolean"
+        },
+        "allowNetworkDownloads": {
+          "type": "boolean"
+        },
+        "portal": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "baseUrl": {
+              "type": ["string", "null"]
+            },
+            "tokenEnv": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "modulePacks"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "modulePacks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"
+          },
+          "uniqueItems": true
+        }
+      }
+    }
+  }
+}

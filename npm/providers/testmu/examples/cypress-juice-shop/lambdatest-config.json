@@ -1,0 +1,37 @@
+{
+  "lambdatest_auth": {
+    "username": "<Your LambdaTest username>",
+    "access_key": "<Your LambdaTest access key>"
+  },
+  "browsers": [
+    {
+      "browser": "Chrome",
+      "platform": "Windows 10",
+      "versions": [
+        "latest"
+      ]
+    }
+  ],
+  "run_settings": {
+    "build_name": "PTK Cypress Juice Shop",
+    "parallels": 1,
+    "specs": "cypress/e2e/juice-shop-with-ptk.cy.js",
+    "ignore_files": "",
+    "network": true,
+    "headless": false,
+    "sync": true,
+    "exit-on-failure": true,
+    "command_log": true,
+    "enableCFT": true,
+    "envs": "PTK_CYPRESS_CHROME_FOR_TESTING=true",
+    "cypress_settings": "--config-file cypress.config.js --env PTK_CYPRESS_CHROME_FOR_TESTING=true",
+    "npm_dependencies": {
+      "cypress": "13.17.0",
+      "pentestkit": "latest"
+    }
+  },
+  "tunnel_settings": {
+    "tunnel": false,
+    "tunnel_name": null
+  }
+}

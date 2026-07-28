@@ -1,0 +1,11 @@
+{
+  "id": "brokencrystals",
+  "target": "Broken Crystals",
+  "defaultUrl": "https://brokencrystals.com/",
+  "scenario": "scenario.json",
+  "routeHints": "route-hints.json",
+  "engines": ["DAST", "IAST", "SAST"],
+  "modes": ["no-agent", "scenario", "agent-mock"],
+  "metrics": ["routeCoverage", "endpointCoverage", "scenarioCompletion", "workflowCompletion", "findings", "totalTime", "waitTime", "agentMissionValue"],
+  "agentValueRule": "agent delta must be measured against the no-agent baseline"
+}

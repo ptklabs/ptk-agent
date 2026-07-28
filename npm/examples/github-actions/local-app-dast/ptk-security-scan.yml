@@ -1,0 +1,55 @@
+name: PTK Security Scan
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  ptk:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install browser
+        run: npx playwright install chromium --with-deps
+
+      - name: Run app
+        run: |
+          npm run dev &
+          npx wait-on http://localhost:3000
+
+      - name: Run OWASP PTK
+        run: |
+          npx ptk-scan http://localhost:3000 \
+            --engine DAST \
+            --format sarif \
+            --output ptk-results.sarif \
+            --output-dir .ptk/artifacts \
+            --fail-on high
+
+      - name: Upload PTK SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v4
+        with:
+          sarif_file: ptk-results.sarif
+          category: owasp-ptk
+
+      - name: Upload PTK artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ptk-artifacts
+          path: .ptk/artifacts
