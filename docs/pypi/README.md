@@ -33,21 +33,13 @@ from pentestkit.core import PTKBridge
 
 Use `pentestkit.playwright` for Playwright Python suites, `pentestkit.selenium` for Selenium WebDriver suites, `pentestkit.extensions` for bundled extension artifact paths, and `pentestkit.core` only when building a custom framework adapter.
 
-## Extension Artifacts
+## PTK Auto
 
-The PyPI package bundles PTK extension artifacts:
-
-- `pentestkit/extensions/chromium-unpacked`
-- `pentestkit/extensions/ptk-latest-chromium.zip`
-- `pentestkit/extensions/ptk-latest.crx`
-- `pentestkit/extensions/ptk-latest.xpi`
-- `pentestkit/extensions/extension-provenance.json`
-
-Playwright Chromium, Chrome, and Edge use the bundled unpacked extension by default. Provider integrations can upload `ptk-latest-chromium.zip`. Override with `PTK_EXTENSION_PATH` or `PTK_EXTENSION_ZIP_PATH` only for custom builds.
+The package includes the PTK Auto browser runtime required by the framework integrations. Playwright Chromium, Chrome, and Edge use the packaged Chromium extension by default. Override `PTK_EXTENSION_PATH` only when intentionally testing a custom extension build.
 
 Selenium Chrome and Edge still work best with prepared profiles in many environments, but the bundled unpacked extension path is available through `pentestkit.extensions.chromium_unpacked_path()` and `PTKConfig.extension_path`. Firefox temporary-addon mode uses the bundled XPI unless `PTK_EXTENSION_XPI_PATH` is set.
 
-The packaged extension artifacts are automation-ready SDK artifacts and include `dev.local.json` with `automationEnabled: true`. Store artifacts remain separate and do not enable automation by default.
+PTK Auto is the dedicated automation extension; no manual Automation Mode setting is required.
 
 Use dedicated automation profiles. Do not use a daily browser profile for security scans.
 

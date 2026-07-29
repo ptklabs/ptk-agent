@@ -1,6 +1,17 @@
 # Troubleshooting
 
-## `--doctor-extension` Does Not Report `bundled-package`
+Use strict bridge and export requirements while diagnosing a scan:
+
+```bash
+npx ptk-scan https://your-authorised-target.example \
+  --require-ptk-bridge \
+  --require-ptk-findings-export \
+  --wait-for-ptk-complete
+```
+
+These flags turn a missing extension or failed export into a visible command failure.
+
+## Extension Diagnostic Fails
 
 Run:
 
@@ -8,14 +19,14 @@ Run:
 npx ptk-agent --doctor-extension
 ```
 
-If the source is `env`, `explicit`, or `local-dev`, check:
+A registry installation normally reports `bundled-package`. If it reports an environment or explicit override, check:
 
 ```bash
 echo "$PTK_EXTENSION_DIR"
 echo "$PTK_EXTENSION_PATH"
 ```
 
-Unset overrides to test bundled resolution:
+Remove unintended overrides:
 
 ```bash
 unset PTK_EXTENSION_DIR
@@ -23,202 +34,149 @@ unset PTK_EXTENSION_PATH
 npx ptk-agent --doctor-extension
 ```
 
+When intentionally using a custom extension, confirm that the path is absolute, contains `manifest.json`, and points to PTK Auto rather than the full manual extension.
+
 ## PTK Bridge Missing
 
-Symptoms:
+Common symptoms include `PTK bridge not ready`, `--require-ptk-bridge` failure, or lifecycle output that reports no bridge.
 
-- scan succeeds but PTK findings are invalid
-- `--require-ptk-bridge` fails
-- `ptk-lifecycle.json` reports missing bridge
+Check the following:
 
-Checks:
+1. Use a supported browser and framework combination.
+2. Run headed once so extension startup is visible.
+3. Close other browser processes using the same automation profile.
+4. Confirm PTK Auto is installed in a prepared Firefox or Chrome profile.
+5. If using the full OWASP PTK extension, enable Automation Mode in its settings.
+6. For cloud browsers, use a combination marked **Supported** in the [provider matrix](provider-browser-matrix.md).
 
-1. Make sure a supported browser is used.
-2. Run headed once to see extension startup.
-3. Verify Automation Mode is enabled for prepared profiles.
-4. Confirm the extension path resolves with `--doctor-extension`.
-5. Avoid reusing a browser profile that is already open in another browser process.
+An automation WebSocket, CDP endpoint, or provider session does not install PTK Auto by itself.
 
 ## Findings Export Missing
 
-If `--require-ptk-findings-export` fails, inspect:
+Inspect the lifecycle files in the selected output directory:
 
 ```text
 ptk-lifecycle.json
 ptk-lifecycle-normalized.json
 ```
 
-Important fields:
+Check whether:
 
-- export attempted before stop
-- export success/failure reason
-- session lookup source
-- findings API fallback usage
-- engine incomplete/cancelled state
-- SAST collection/analysis state
+- PTK started a session for the expected origin;
+- each requested engine participated;
+- the session reached a terminal state;
+- pending findings were drained before browser close;
+- findings export succeeded;
+- an engine was cancelled or incomplete.
 
-A valid scan with zero findings is different from an invalid scan where export failed.
-
-## Auth Fails
-
-Use environment variables and include secrets for local browser execution:
-
-```bash
-export PTK_SCAN_USERNAME='user@example.test'
-export PTK_SCAN_PASSWORD='change-me'
-
-npx ptk-scan https://target.example \
-  --engine DAST,IAST,SAST,SCA \
-  --username-env PTK_SCAN_USERNAME \
-  --password-env PTK_SCAN_PASSWORD \
-  --include-secrets \
-  --scenario login.md \
-  --require-ptk-bridge \
-  --require-ptk-findings-export \
-  --wait-for-ptk-complete \
-  --ptk-drain-timeout-ms 120000
-```
-
-Common causes:
-
-- missing credentials
-- placeholder credentials
-- rejected credentials
-- rate limiting
-- account lock
-- captcha
-- CSRF token mismatch
-- target network error
-
-Do not judge crawler or agent value when auth preflight is invalid.
+A completed scan with zero findings is valid. A run where the extension or export failed is not equivalent to zero findings.
 
 ## Browser Launch Fails
 
-Try Chromium first:
+Try a headed Chromium run first:
 
 ```bash
-npx ptk-scan https://target.example --browser chromium --headed
+npx ptk-scan https://your-authorised-target.example \
+  --browser chromium \
+  --headed
 ```
 
-If the error says the Playwright executable does not exist, install the browser binaries in the project where `pentestkit` is installed:
+If Playwright reports that the browser executable is missing:
 
 ```bash
 npx playwright install chromium
 ```
 
-For Firefox scans:
+For Firefox:
 
 ```bash
 npx playwright install firefox
 ```
 
-If the error says `browserType.launchPersistentContext: Timeout ... exceeded`, the browser executable exists but the persistent extension profile did not finish starting within the startup budget. First launch after install/reinstall can be slower. Retry once, or increase the startup budget:
+If the first persistent-browser launch times out, retry once with a larger startup budget:
 
 ```bash
-npx ptk-scan https://target.example --browser-launch-timeout-ms 60000
+npx ptk-scan https://your-authorised-target.example \
+  --browser-launch-timeout-ms 60000
 ```
 
-If using Edge or Chrome, verify the browser exists and is not blocked by local policy. If using a persistent profile, close all browser windows using that profile before the scan.
+For Edge or Chrome, confirm that the browser is installed and that local policy permits automation extension loading. If branded Chrome blocks unpacked extensions, use Chromium, Edge, or a prepared Chrome profile.
 
-## Generated Extension Artifact Fails
+## Authentication Fails
 
-If CRX generation fails, make sure Chrome or Chromium is available:
+Provide credentials through environment variables and pair them with a login scenario:
 
 ```bash
-export CHROME_BIN=/path/to/chrome
+export PTK_SCAN_USERNAME='user@example.test'
+export PTK_SCAN_PASSWORD='replace-me'
+
+npx ptk-scan https://your-authorised-target.example \
+  --scenario login.md \
+  --username-env PTK_SCAN_USERNAME \
+  --password-env PTK_SCAN_PASSWORD \
+  --include-secrets
 ```
 
-Then run:
+Common causes are rejected or placeholder credentials, account lockout, rate limiting, CAPTCHA, CSRF mismatch, and an unreachable identity provider. Resolve authentication before comparing crawl coverage or findings.
 
-```bash
-node -e 'const { ensurePtkCrx } = require("pentestkit/extensions"); console.log(ensurePtkCrx())'
-```
+## Remote Provider Cannot Reach The Target
 
-If you need a stable Chromium extension id, provide a persistent private key:
+A cloud browser cannot normally access an application bound to your workstation's `localhost`. Use the provider's tunnel or local-testing feature, or deploy the target to an authorised environment reachable from that provider.
 
-```bash
-export PTK_CRX_KEY=/secure/path/ptk-automation-crx.pem
-```
+Confirm that:
 
-Do not commit the key. Delete only generated CRX/XPI/cache artifacts when cleaning up; keep the key if stable extension ids matter.
+- `PTK_PROVIDER_TARGET_URL` is set explicitly;
+- the provider dashboard shows the intended URL;
+- redirects remain within the authorised origin;
+- the selected provider/framework supports extensions;
+- the remote session shows PTK Auto loaded.
 
-If a provider upload keeps using an old extension id, refresh the upload cache:
-
-```bash
-PTK_EXTENSION_UPLOAD_CACHE=refresh node your-provider-test.js
-```
-
-Set `PTK_EXTENSION_UPLOAD_CACHE=off` when you want no provider upload cache reads or writes.
+See [provider integrations](providers.md).
 
 ## Too Much Or Too Little Crawling
 
-Start with small budgets:
+Start with conservative limits:
 
 ```bash
-npx ptk-scan https://target.example \
+npx ptk-scan https://your-authorised-target.example \
   --max-routes 20 \
   --max-actions-per-route 1 \
   --max-forms-per-route 0
 ```
 
-Then increase:
+Then increase them deliberately:
 
 ```bash
-npx ptk-scan https://target.example \
+npx ptk-scan https://your-authorised-target.example \
   --max-routes 100 \
   --crawl-depth 5 \
   --max-actions-per-route 3 \
   --max-forms-per-route 1
 ```
 
-For business flows, use scenarios rather than only increasing route count.
+Use a scenario for login, checkout, and other business flows instead of relying only on a larger generic crawl budget.
 
-## Agent Provider Does Not Add Value
+## Results Contain Sensitive Data
 
-First validate the no-agent baseline:
+Scan output can contain page evidence, URLs, request metadata, screenshots, traces, and—when explicitly enabled—authentication or replay material.
 
-```bash
-npx ptk-scan https://target.example \
-  --agent-mode off \
-  --output-dir .ptk/artifacts/no-agent
-```
+- Restrict access to local output and provider dashboards.
+- Use protected CI artifact storage.
+- Apply an appropriate retention policy.
+- Redact credentials, cookies, authorisation headers, tokens, and personal data before sharing diagnostics.
+- Prefer evidence-only exports unless replay data is specifically required.
 
-Then run provider mode:
+If sensitive values were exposed in logs or an issue, revoke or rotate them through the relevant application or provider immediately.
 
-```bash
-npx ptk-scan https://target.example \
-  --agent-mode provider \
-  --agent-provider opencode \
-  --agent-model opencode/big-pickle \
-  --max-agent-turns 3 \
-  --output-dir .ptk/artifacts/opencode
-```
+## Getting Help
 
-Compare coverage:
+Include the following safe details in a bug report:
 
-```bash
-npx ptk-agent compare \
-  --baseline-artifact .ptk/artifacts/no-agent/run-summary.json \
-  --candidate-artifact .ptk/artifacts/opencode/run-summary.json \
-  --format text
-```
+- `pentestkit` version;
+- operating system, browser, framework, and provider;
+- the command shape with secrets removed;
+- redacted `--doctor-extension` output;
+- redacted lifecycle status and error code;
+- whether the problem reproduces in a headed local Chromium session.
 
-Agent value can be more routes, forms, endpoints, or business-flow coverage. It does not always mean more findings.
-
-## Clean Local Artifacts
-
-The following are runtime artifacts and should not be committed:
-
-```text
-.ptk/
-.ptk-agent/
-playwright-report/
-test-results/
-downloads/
-videos/
-screenshots/
-*.trace.zip
-*.har
-```
-
-Delete them when they are no longer needed.
+Do not attach unredacted scan evidence or credentials to a public issue. Report suspected security vulnerabilities through a private GitHub security advisory.

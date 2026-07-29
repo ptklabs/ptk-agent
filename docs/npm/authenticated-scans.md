@@ -100,12 +100,11 @@ When scenarios require login, failed authentication is treated differently from 
 
 Do not compare scan coverage or agent value when the deterministic auth/scenario baseline is invalid.
 
-## Secret Handling
+## Protect Credentials And Evidence
 
-Rules:
-
-- Use CI secrets or local environment variables.
-- Do not commit profile files with real credentials.
-- Do not commit `.ptk/`, browser profiles, cookies, traces, screenshots, videos, or replayable export bundles.
-- Agents/providers receive sanitized observations and redacted evidence.
-- Replayable secret-bearing exports require explicit privileged SDK export paths and local operator intent.
+- Supply credentials through environment variables or a CI secret manager.
+- Use a dedicated test account with the minimum permissions needed for the scenario.
+- Restrict access to browser profiles, cookies, traces, screenshots, videos, and replayable exports.
+- Apply an appropriate retention policy to local and CI scan outputs.
+- Agents and providers receive sanitised observations and redacted evidence by default.
+- Replayable secret-bearing exports require an explicit privileged SDK path and should be encrypted and tightly access-controlled.

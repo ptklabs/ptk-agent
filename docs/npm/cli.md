@@ -247,7 +247,7 @@ require("pentestkit/cypress");
 require("pentestkit/playwright");
 require("pentestkit/puppeteer");
 require("pentestkit/selenium");
-require("pentestkit/extensions/provenance");
+require("pentestkit/extensions");
 require("pentestkit/package.json");
 ```
 

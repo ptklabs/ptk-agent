@@ -1,26 +1,22 @@
 # Browserbase PTK Examples
 
-These examples use the `pentestkit` npm package directly.
-
-Required:
+These examples run PTK Auto in Browserbase with Playwright, Puppeteer, or Selenium.
 
 ```bash
 export BROWSERBASE_API_KEY=...
-export PTK_PROVIDER_TARGET_URL=https://your-approved-target.example
+export PTK_PROVIDER_TARGET_URL=https://your-authorised-target.example
 ```
 
-`BROWSERBASE_PROJECT_ID` is optional and is inferred when the account permits.
+`BROWSERBASE_PROJECT_ID` is optional when Browserbase can infer the project from your API key. Set `BROWSERBASE_EXTENSION_ID` only when you want to reuse PTK Auto already uploaded to the same account.
 
-Set `BROWSERBASE_EXTENSION_ID` to reuse an uploaded PTK extension, or let the helper upload the packaged automation ZIP and cache the provider extension id.
-
-All examples run DAST, SAST, IAST, and SCA, poll for engine participation,
-allow same-origin child routes, reject external navigation, export evidence,
-and release the Browserbase session in `finally`.
-
-Run:
+Run one framework:
 
 ```bash
 node node_modules/pentestkit/providers/browserbase/examples/playwright-juice-shop.mjs
 node node_modules/pentestkit/providers/browserbase/examples/puppeteer-juice-shop.mjs
 node node_modules/pentestkit/providers/browserbase/examples/selenium-juice-shop.mjs
 ```
+
+Each example enables DAST, SAST, IAST, and SCA; permits same-origin child routes; rejects unrelated external navigation; exports PTK evidence; and closes the Browserbase session.
+
+See [Browserbase browser extensions](https://docs.browserbase.com/platform/browser/core-features/browser-extensions).

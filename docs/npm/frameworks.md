@@ -134,7 +134,7 @@ setupNodeEvents(on, config) {
 }
 ```
 
-Do not modify the installed package ZIP or generated cache artifacts. Override `PTK_EXTENSION_PATH` only when you need to test a source-built unpacked extension.
+The packaged extension is selected automatically. Override `PTK_EXTENSION_PATH` only when you intentionally need to test a custom unpacked extension build.
 
 Register commands in `cypress/support/e2e.js`:
 
@@ -218,4 +218,4 @@ npx ptk-scan https://target.example \
   --output-dir .ptk/artifacts/standalone
 ```
 
-Keep output directories as CI artifacts, not source-controlled files.
+Upload output directories to protected CI artifact storage and apply a retention policy appropriate for security evidence.

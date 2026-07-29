@@ -9,13 +9,7 @@ npm install -D pentestkit playwright
 npx playwright install chromium
 ```
 
-For a local source-built package, build the tarball from `ptk-agent/npm` and install it instead:
-
-```bash
-npm install -D /path/to/ptk-agent/npm/.release/npm/pentestkit-*.tgz playwright
-```
-
-Both install paths use the same import:
+Use the public package import:
 
 ```js
 import { withPtkScan } from "pentestkit/playwright";
@@ -77,7 +71,7 @@ const { withPtkScan } = require("pentestkit/playwright");
 
 ## Extension Loading
 
-For any installed `pentestkit` package, registry or local source-built, resolve an unpacked extension from the bundled automation ZIP:
+Resolve the unpacked extension from the installed package:
 
 ```js
 import { ensureUnpackedPtkExtension } from "pentestkit/extensions";
@@ -85,10 +79,10 @@ import { ensureUnpackedPtkExtension } from "pentestkit/extensions";
 const extensionPath = ensureUnpackedPtkExtension().path;
 ```
 
-Use `PTK_EXTENSION_PATH` only when testing a source-built unpacked extension:
+Use `PTK_EXTENSION_PATH` only when testing a custom unpacked extension:
 
 ```bash
-export PTK_EXTENSION_PATH=/path/to/ptk-agent/dist/ptk_extension_unpacked_automation
+export PTK_EXTENSION_PATH=/absolute/path/to/custom-ptk-auto
 ```
 
 For cloud browser providers such as Browserless or Browserbase, upload or preinstall PTK in the provider profile/session, connect to the provider as usual, then pass the provider page to `withPtkScan()`.

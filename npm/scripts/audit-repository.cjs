@@ -104,6 +104,26 @@ function secretFindings(filePath, relative) {
   return findings;
 }
 
+function documentationAudienceFindings(filePath, relative) {
+  if (!relative.endsWith('.md')) return [];
+  const text = fs.readFileSync(filePath, 'utf8');
+  const findings = [];
+  const patterns = [
+    ['repository housekeeping', /\b(?:do not commit|must stay out of source control)\b/i],
+    ['local release path', /(?:^|[\s`'"(])(?:npm\/)?\.release(?:\/|\b)/im],
+    ['local extension source path', /(?:^|[\s`'"(])(?:\/[^\s`'")]+\/)?ptk-agent\/dist(?:\/|\b)/im],
+    ['release provenance input', /extension-provenance-automation\.json/i],
+    ['extension signing operation', /\bCRX private key\b/i],
+    ['provider cache implementation', /\b(?:provider-cache|account-context fingerprint)\b/i],
+    ['account-specific test evidence', /\b(?:live matrix|release[- ]candidate (?:matrix|result|evidence))\b/i],
+    ['incorrect npm package identity', /@ptklabs\/agent\b/i]
+  ];
+  for (const [label, pattern] of patterns) {
+    if (pattern.test(text)) findings.push(`${label} in ${relative}`);
+  }
+  return findings;
+}
+
 function verifyGitignore(root = REPOSITORY_ROOT) {
   const gitignorePath = path.join(root, '.gitignore');
   if (!fs.existsSync(gitignorePath)) return ['Missing repository .gitignore'];
@@ -124,6 +144,7 @@ function auditRepository(root = REPOSITORY_ROOT) {
     const reason = suspiciousFileReason(file.relative);
     if (reason) errors.push(`${reason}: ${file.relative}`);
     errors.push(...secretFindings(file.fullPath, file.relative));
+    errors.push(...documentationAudienceFindings(file.fullPath, file.relative));
   }
   if (errors.length) {
     throw new Error(`Repository audit failed:\n${errors.map((error) => `- ${error}`).join('\n')}`);
@@ -152,6 +173,7 @@ module.exports = {
   EXCLUDED_DIRECTORIES,
   REPOSITORY_ROOT,
   auditRepository,
+  documentationAudienceFindings,
   secretFindings,
   suspiciousFileReason,
   verifyGitignore,

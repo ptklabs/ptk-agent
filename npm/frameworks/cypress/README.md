@@ -5,14 +5,14 @@ Cypress plugin for running PTK security scans during E2E tests.
 For shared PTK automation concepts, browser support, extension-loading modes, and profile setup, start with the [framework integration guide](https://github.com/ptklabs/ptk-agent/blob/main/docs/npm/frameworks.md).
 
 Supported startup modes:
-- Extension mode: load the bundled PTK extension, or an unpacked source extension from `PTK_EXTENSION_PATH`, through a Cypress-prepared run-local copy.
+- Extension mode: load the bundled PTK extension, or a custom unpacked extension from `PTK_EXTENSION_PATH`, through a Cypress-prepared run-local copy.
 - Profile mode (Firefox): use an existing profile from `PTK_PROFILE_DIR`.
 
 ## Prerequisites
 
 - Node.js 18+
 - Cypress 12+
-- Bundled PTK browser extension from the `pentestkit` package, or an unpacked source extension via `PTK_EXTENSION_PATH`
+- Bundled PTK browser extension from the `pentestkit` package, or a custom unpacked extension via `PTK_EXTENSION_PATH`
 - Or a Firefox profile with PTK pre-installed and **Automation Mode** already enabled (profile mode)
 - A supported browser (see [Browser Support](#browser-support))
 
@@ -26,13 +26,7 @@ Install `pentestkit` from the registry:
 npm install -D pentestkit cypress
 ```
 
-For a local source-built package, build the tarball from `ptk-agent/npm` and install it instead:
-
-```bash
-npm install -D /path/to/ptk-agent/npm/.release/npm/pentestkit-*.tgz cypress
-```
-
-Both install paths use the same package export:
+Use the public package export:
 
 ```javascript
 const { setupPtkCypress, registerCommands } = require("pentestkit/cypress");
@@ -58,7 +52,7 @@ module.exports = defineConfig({
   },
   env: {
     // Optional automation artifact override. Registry installs use the bundled extension by default.
-    // PTK_EXTENSION_PATH: "/path/to/ptk-agent/dist/ptk_extension_unpacked_automation",
+    // PTK_EXTENSION_PATH: "/absolute/path/to/custom-ptk-auto",
     // Profile mode (Firefox only; takes precedence if set)
     // PTK_PROFILE_DIR: "/path/to/firefox/profile",
   },
@@ -171,7 +165,7 @@ setupNodeEvents(on, config) {
 
 The final allowlist is `baseUrl` plus explicit origins. Empty origin lists are rejected; they do not mean "allow all".
 
-Do not edit the bundled ZIP in `node_modules`, the source extension in `pentestkit/src`, or generated CRX/XPI/cache artifacts. The generated copy is test fixture state and should stay out of source control.
+The plugin manages its run-specific extension copy. Configure it through `setupPtkCypress()` and use `PTK_EXTENSION_PATH` only when intentionally testing a custom PTK Auto build.
 
 ## Security Model
 

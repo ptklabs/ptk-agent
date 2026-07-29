@@ -26,7 +26,7 @@ export LT_USERNAME="..."
 export LT_ACCESS_KEY="..."
 ```
 
-Then update `lambdatest-config.json`:
+The included `lambdatest-config.json` contains placeholders. Supply the real values through TestMu's protected CI/environment integration. If your TestMu workflow requires a materialised runtime config, create it only inside the protected job workspace and remove it when the job completes:
 
 ```json
 "lambdatest_auth": {
@@ -34,8 +34,6 @@ Then update `lambdatest-config.json`:
   "access_key": "<Your LambdaTest access key>"
 }
 ```
-
-Keep the file out of source control when real credentials are written into it.
 
 Select the explicitly approved provider-reachable target:
 

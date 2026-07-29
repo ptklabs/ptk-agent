@@ -1,25 +1,16 @@
 # Browserless PTK Examples
 
-These examples use the `pentestkit` npm package directly.
+Browserless loads PTK Auto by extension name in a Chromium Playwright or Puppeteer session.
 
-Required:
+Upload the Chromium PTK Auto ZIP in the Browserless dashboard, then set:
 
 ```bash
 export BROWSERLESS_API_KEY=...
-export BROWSERLESS_EXTENSION_NAME=...
-export PTK_PROVIDER_TARGET_URL=https://your-approved-target.example
+export BROWSERLESS_EXTENSION_NAME=ptk-auto
+export PTK_PROVIDER_TARGET_URL=https://your-authorised-target.example
 ```
 
-`BROWSERLESS_TOKEN` is accepted as an alias for `BROWSERLESS_API_KEY`. The extension must already be uploaded in Browserless. The provider helper passes it through `launch.extensions`.
-
-Browserless PTK sessions use the Chromium root or `/chromium` CDP endpoint and
-the extension-bearing default context. The examples run all four PTK engines,
-poll for participation, enforce exact-origin navigation, export evidence, and
-close the remote browser in `finally`.
-
-Browserless Cloud v2 does not expose Selenium/WebDriver. Its current extension
-support is limited to Chromium CDP through Playwright, Puppeteer, or BQL, so the
-package intentionally does not offer a Browserless Selenium connector.
+`BROWSERLESS_TOKEN` is accepted as an alias for `BROWSERLESS_API_KEY`.
 
 Run:
 
@@ -27,3 +18,7 @@ Run:
 node node_modules/pentestkit/providers/browserless/examples/playwright-juice-shop.mjs
 node node_modules/pentestkit/providers/browserless/examples/puppeteer-juice-shop.mjs
 ```
+
+Browserless v2 does not expose Selenium/WebDriver, so no Selenium example is provided. Each example enables all four PTK engines, enforces exact-origin scope while allowing same-origin child routes, exports evidence, and closes the remote browser.
+
+See [Browserless browser extensions](https://docs.browserless.io/baas/features/browser-extensions).

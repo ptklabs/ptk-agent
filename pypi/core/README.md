@@ -1,11 +1,10 @@
 # ptk-core Source
 
-This directory contains the internal source for the `ptk-core` implementation package. Public package documentation is maintained in `ptk-agent/docs/pypi/core.md` for the `pentestkit.core` import surface.
+This directory implements the framework-neutral `pentestkit.core` API. Public usage is documented in [the core API guide](../../docs/pypi/core.md).
 
 ## Source Setup
 
 ```bash
-cd ptk-agent/pypi/core
 pip install -e .
 ```
 
@@ -26,6 +25,6 @@ Keep this package framework-neutral. Browser launching and profile management be
 Run the PyPI package smoke from the PyPI SDK root:
 
 ```bash
-cd ptk-agent/pypi
+cd pypi
 python scripts/smoke_packages.py
 ```

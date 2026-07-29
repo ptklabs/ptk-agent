@@ -1,101 +1,54 @@
 # PTK Automation And Extension Loading
 
-This is the Agent SDK local guide for PTK browser integration. The source-of-truth API contract is `../../../docs/automation.md`; update that file when `window.PTK_AGENT` or `window.PTK_AUTOMATION` behavior changes.
+PTK Auto is the browser security runtime used by PTK Agent. The Agent drives the authorised browser journey; PTK Auto performs the selected DAST, IAST, SAST, and SCA work and exports the resulting evidence.
 
-## Runtime Contract
+The public browser protocol is documented in [the automation API](../../../docs/automation.md). Installed-package browser setup is documented in [extension loading](../../../docs/npm/extension-loading.md).
 
-PTK is the scanner. The Agent SDK drives the browser so PTK can observe traffic, client-side state, and workflow transitions.
+## Required Lifecycle
 
-Every scanner run needs:
+Every PTK-backed run needs:
 
-1. A supported browser with the PTK extension loaded.
-2. The dedicated PTK Auto extension, or the separate full extension with its Automation Mode setting enabled for the target tab.
-3. SDK lifecycle control: start scan, execute scenario/crawl, stop scan, export findings.
+1. a supported browser with PTK Auto loaded;
+2. an explicitly authorised target and bounded scope;
+3. a PTK session started for the target origin;
+4. the application journey or crawl;
+5. engine drainage and a terminal stop;
+6. a successful findings export;
+7. browser and provider cleanup.
 
-Use `window.PTK_AGENT` as the primary workflow API:
+Use `window.PTK_AGENT` as the primary workflow API. `window.PTK_AUTOMATION` is the lower-level compatibility and chunked-export API.
 
-- `describe`
-- `preflight`
-- `startScan`
-- `scanStatus`
-- `stopScan`
-- `getFindings`
-- `exportFullReport`
+Full navigation replaces page JavaScript state. Wait for the bridge again after a navigation before issuing lifecycle, status, findings, or export calls.
 
-`stopScan({ immediateAnalysis: false })` is the public way to defer post-stop analysis in normal automation. The default is immediate analysis. Use `immediateAnalysis: true` only when a caller needs to override a config that deferred it.
+## IAST Before Navigation
 
-Use `window.PTK_AUTOMATION` only for low-level compatibility and export chunk follow-up required by the automation contract.
+IAST document-start hooks must be armed before the first application document loads. Framework helpers do this automatically when `bootstrapUrl` is provided. A custom journey using `deferStart` should call `armPtkIastForNavigation(targetUrl)` before its first `goto()` or `driver.get()`.
 
-Full navigation replaces the page JavaScript context. After navigation, wait for the bridge again before calling lifecycle, status, findings, or export methods.
-
-## Lifecycle Rules
-
-- Start PTK before authentication when credentials or scenario auth are configured.
-- Normal automation stops compute analysis by default; pass `immediateAnalysis: false` to defer analysis until import/load/recompute in PTK.
-- Treat missing PTK as invalid findings, not as zero findings.
-- In benchmark mode, require PTK bridge/export unless `--allow-missing-ptk` is explicit.
-- Write `ptk-lifecycle.json` for bridge, start, stop, export, validity, and reason.
-- Write `ptk-findings-count.json` for comparable finding counts and redacted samples.
-- Redact secrets by default in bridge artifacts, provider context, telemetry, and exports.
+The arm operation is restricted to the exact approved origin and does not authorise external navigation.
 
 ## Browser Support
 
-This mirrors the repo-level SDK matrix in `../../extension-loading-matrix.md`.
+| Browser | Recommended loading mode |
+| --- | --- |
+| Chromium | Automatic unpacked PTK Auto loading. |
+| Edge | Chromium integration with an installed Edge executable. |
+| Chrome | Unpacked loading where local policy permits it; otherwise use a prepared profile, Edge, or Chromium. |
+| Firefox | Dedicated profile with the signed PTK Auto XPI installed. |
 
-| Browser | SDK support | Loading mode |
-|---|---|---|
-| Chromium | Supported current CLI baseline | SDK tests load the bundled package extension or `dist/ptk_extension_unpacked_automation`; the artifact provides the automation-enabled default. |
-| Edge | Supported when an executable path or install can be resolved | Same Chromium-family extension model. |
-| Chrome | Best-effort guidance | Some branded Chrome builds ignore unpacked extension flags. Use Chromium first if the PTK service worker is missing. |
-| Firefox | Prepared-profile guidance only | Use a Firefox profile with the signed PTK Auto XPI installed. The separate full-extension XPI also requires its Automation Mode setting. |
-
-A browser bridge token is not a PTK installer. It only lets an adapter connect to a browser/profile that already has PTK and any required bridge extension installed.
+A WebSocket endpoint, CDP connection, or browser bridge token does not install PTK Auto. Cloud-provider support also depends on whether that provider exposes custom extensions for the selected framework.
 
 ## Profiles
 
-Use dedicated test profiles. Do not use a daily browser profile.
+Use a dedicated automation profile for each browser family. Do not use a personal daily-browsing profile for security scans, and do not open the same profile from two browser processes simultaneously.
 
-Rules:
+PTK Auto requires no manual mode switch. A prepared profile using the separate full OWASP PTK extension must have Automation Mode enabled.
 
-- Use one profile per browser family.
-- Close all browser windows using a profile before automated runs.
-- Keep persistent profiles outside the repo, for example `~/profiles/ptk/chromium`.
-- Prefer per-run profiles for deterministic unpacked-extension scans.
-- PTK Auto profiles need no manual mode switch. If a prepared profile uses the separate full extension, enable that extension's Automation Mode once.
+## Validity
 
-## Scenario And PTK Interaction
+- Missing bridge means PTK was not available; it is not zero findings.
+- Missing export means the findings comparison is invalid.
+- A terminal export with zero findings is a valid result.
+- Requested engines must show participation separately from finding counts.
+- Browser closure must wait for engine and publisher queues to drain.
 
-Scenario execution should improve PTK visibility, not hide scanner failures.
-
-- Use explicit JSON scenario DAGs for benchmark gates.
-- Start PTK before scenario auth.
-- Feed scenario-discovered routes/endpoints into crawl coverage.
-- Mark scenario failure separately from crawl completion.
-- Matrix rows must show scenario status, failed step, PTK bridge status, finding validity, and finding count.
-
-## Troubleshooting
-
-`PTK automation bridge not available`
-
-- Confirm the browser loaded PTK.
-- Confirm PTK Auto is installed, or that Automation Mode is enabled when the profile uses the separate full extension.
-- In Chromium/Edge unpacked mode, check that the PTK service worker exists.
-- Retry the default Chromium path before treating this as a scanner bug.
-
-`PTK bridge detected but findings are invalid`
-
-- Check `ptk-lifecycle.json`.
-- `bridgeDetected=false` means PTK never loaded or automation was disabled.
-- `exportSucceeded=false` means full report export failed; inspect `reason`.
-- `hasFindingsExport=false` means finding comparison must not be trusted.
-
-`Profile is locked`
-
-- Close every browser window using that profile.
-- Use a fresh per-run profile or a separate dedicated profile.
-
-`Firefox starts but PTK is missing`
-
-- Confirm the XPI is installed at the expected profile path.
-- Confirm the signed PTK Auto XPI is installed. For the separate full extension, also confirm Automation Mode is enabled.
-- Do not expect Chromium-style `--load-extension` behavior in Firefox.
+Lifecycle output should preserve these distinctions without exposing credentials, cookies, authorisation headers, tokens, request bodies, or replay secrets.

@@ -1,289 +1,32 @@
-# Provider Integrations
+# Cloud Browser Providers
 
-The npm package includes provider helpers under `pentestkit/providers/*`. They are small adapters around the provider's own connection model: create or connect to a cloud browser session, make sure PTK is loaded, then pass the normal page or driver to `withPtkScan()`.
+PTK Agent provider helpers connect your existing Playwright, Puppeteer, or Selenium journey to a remote browser with PTK Auto loaded. Your test still controls navigation and application actions; PTK wraps that journey with DAST, SAST, IAST, and SCA checks.
 
-Provider helpers do not own the test journey. Open your normal application URL in your test and start PTK after the first real application page is available.
+Start with the [support matrix](provider-browser-matrix.md). Choose a **Supported** combination for production or CI use.
 
-For the current provider/framework/browser verification snapshot, see [provider browser matrix](provider-browser-matrix.md).
+## Common Setup
 
-## Local Credential File
-
-For local live-provider testing from the source repository, copy the committed
-`.env.example` file to `.env` and fill only the providers you want to run.
-`.env` and its values are ignored by Git; `.env.example` contains names and safe
-defaults only. Load it explicitly with Node.js rather than adding a dotenv
-runtime dependency:
+Install the package:
 
 ```bash
-node --env-file=.env path/to/provider-test.mjs
+npm install -D pentestkit
 ```
 
-Do not use a localhost target with a remote browser unless the provider tunnel
-is configured. The template requires an explicit approved provider-reachable
-target and does not silently fall back to a public site.
-Browserless additionally requires the name or id of a PTK extension that has
-already been uploaded to the Browserless account.
+Some providers also require their official SDK, as shown below.
 
-The packaged Node examples request `DAST`, `SAST`, `IAST`, and `SCA`; poll for
-participation instead of sleeping for a fixed duration; permit owned
-same-origin child routes; reject cross-origin navigation; export evidence; and
-always close the provider connection. Zero findings and a missing engine are
-reported separately.
-
-Set the target explicitly before running any packaged example:
+Set an explicitly authorised target for the packaged examples:
 
 ```bash
-export PTK_PROVIDER_TARGET_URL=https://your-approved-target.example
+export PTK_PROVIDER_TARGET_URL=https://your-authorised-target.example
 ```
 
-The examples do not contain a public fallback target.
+Remote browsers cannot reach `localhost` unless the provider's secure tunnel or local-testing feature is running. PTK examples never fall back to a public target.
 
-## Extension Formats By Provider
+Provider credentials belong in environment variables or a CI secret manager. Avoid placing access keys in source files, command arguments, recorded capabilities, or shared logs.
 
-| Provider/framework | PTK artifact path |
-| --- | --- |
-| TestMu Playwright/Puppeteer | uploaded or hosted ZIP from `extensions/ptk-latest.zip` |
-| TestMu Selenium | bundled, provenance-checked CRX embedded in Selenium capabilities |
-| TestMu k6 Browser | `window.PTK_AGENT` only if PTK is preloaded in the provider browser session |
-| BrowserStack Selenium | bundled, provenance-checked CRX embedded in Selenium capabilities |
-| BrowserStack Playwright/Puppeteer diagnostics | BrowserStack upload-media `media://...` value passed as `browserstack.uploadMedia`; current live sessions expose zero extension targets |
-| Browserbase | uploaded ZIP, resolved to provider extension id |
-| Browserless Playwright/Puppeteer | already-uploaded Browserless extension name/id passed through `launch.extensions` |
-| Hyperbrowser Playwright/Puppeteer/Selenium | uploaded ZIP, resolved to an extension id and passed through session `extensionIds` |
-| Steel Playwright/Puppeteer | uploaded ZIP, resolved to provider extension id |
-| Steel Selenium diagnostic | `isSelenium` plus authenticated W3C transport and bundled CRX; current Steel Cloud nodes install zero extensions |
+## Common Scan Pattern
 
-The reviewed automation CRX is bundled in the package. Any fallback-generated
-CRX/XPI files, upload cache entries, and CRX private keys live outside
-`node_modules`; see [extension loading](extension-loading.md).
-
-## TestMu Browser Cloud
-
-Install:
-
-```bash
-npm install -D pentestkit @testmuai/testmu-cloud playwright puppeteer-core selenium-webdriver
-```
-
-Required credentials:
-
-```bash
-export LT_USERNAME=...
-export LT_ACCESS_KEY=...
-```
-
-For Playwright and Puppeteer, provide the PTK extension to TestMu in one of three ways:
-
-```bash
-export TESTMU_EXTENSION_CLOUD_URL="https://.../ptk-latest.zip"
-```
-
-or:
-
-```bash
-export TESTMU_UPLOAD_EXTENSION=1
-```
-
-or, when you already have a TestMu SDK extension registry entry:
-
-```bash
-export TESTMU_EXTENSION_ID=...
-export TESTMU_EXTENSIONS_DIR=/path/to/testmu/extensions-metadata
-```
-
-`TESTMU_EXTENSION_ID` is a TestMu SDK registry id, not a browser extension id. It must resolve to a `lambda:loadExtension` URL through TestMu SDK metadata. If that metadata is unavailable, use `TESTMU_EXTENSION_CLOUD_URL` or `TESTMU_UPLOAD_EXTENSION=1`.
-
-The adapter prefers the current `@testmuai/testmu-cloud` SDK and accepts the
-former `@testmuai/browser-cloud` package for compatibility. With explicit
-upload enabled, it calls the current SDK uploader first. PTK's existing
-curl-backed upload is retained only as a bounded fallback for recognized
-upload transport failures; authentication and authorization failures never
-fall back.
-
-Playwright:
-
-```js
-import { withPtkScan } from "pentestkit/playwright";
-import { connectTestMuPlaywright } from "pentestkit/providers/testmu";
-
-const cloud = await connectTestMuPlaywright({
-  capabilities: {
-    browserName: "Chrome",
-    browserVersion: "latest",
-    "LT:Options": {
-      platform: "Windows 10",
-      build: "PTK Playwright Build",
-      name: "PTK Playwright",
-      user: process.env.LT_USERNAME,
-      accessKey: process.env.LT_ACCESS_KEY,
-      network: true,
-      video: true,
-      console: true
-    }
-  }
-});
-
-try {
-  await withPtkScan(cloud.page, {
-    project: "testmu-playwright",
-    engines: ["DAST", "SAST", "IAST", "SCA"],
-    deferStart: true,
-    resultsDir: ".ptk/results/testmu-playwright"
-  }, async ({ page, startPtkScan }) => {
-    await page.goto("https://your-approved-target.example/", { waitUntil: "domcontentloaded" });
-    await startPtkScan();
-
-    // Existing test steps continue here.
-    await page.goto("https://your-approved-target.example/#/search?q=test", { waitUntil: "domcontentloaded" });
-  });
-} finally {
-  await cloud.close();
-}
-```
-
-Packaged TestMu examples:
-
-- `node_modules/pentestkit/providers/testmu/examples/playwright-juice-shop.mjs`
-- `node_modules/pentestkit/providers/testmu/examples/puppeteer-juice-shop.mjs`
-- `node_modules/pentestkit/providers/testmu/examples/selenium-juice-shop.mjs`
-- `node_modules/pentestkit/providers/testmu/examples/cypress-juice-shop/`
-- `node_modules/pentestkit/providers/testmu/examples/k6-browser-juice-shop.js`
-- `node_modules/pentestkit/providers/testmu/examples/README.md`
-
-Run them from an installed project:
-
-```bash
-node node_modules/pentestkit/providers/testmu/examples/playwright-juice-shop.mjs
-node node_modules/pentestkit/providers/testmu/examples/puppeteer-juice-shop.mjs
-node node_modules/pentestkit/providers/testmu/examples/selenium-juice-shop.mjs
-```
-
-TestMu Cypress uses the provider's `lambdatest-cypress-cli` workflow:
-
-```bash
-cp -R node_modules/pentestkit/providers/testmu/examples/cypress-juice-shop ./ptk-testmu-cypress
-cd ./ptk-testmu-cypress
-npm install
-# write LT_USERNAME/LT_ACCESS_KEY into lambdatest-config.json
-npm run testmu
-```
-
-The Cypress example keeps the TestMu config visible in `lambdatest-config.json` and adds PTK only through `cypress.config.js` plus `cypress/support/e2e.js`. It defaults to Edge because PTK Cypress strict mode rejects branded Chrome 137+ extension loading; use Chrome for Testing or Chromium if your TestMu Cypress account exposes those images.
-
-TestMu k6 Browser uses the k6 runtime and CDP endpoint:
-
-```bash
-K6_BROWSER_ENABLED=true k6 run node_modules/pentestkit/providers/testmu/examples/k6-browser-juice-shop.js
-```
-
-k6 scripts cannot import `pentestkit` from npm, so the packaged script starts PTK through `window.PTK_AGENT` after the first real application page is available. The current TestMu k6 Browser documentation does not show an extension upload/preload capability; the browser session must already have PTK loaded and automation enabled.
-
-TestMu Playwright defaults to the CDP transport because that is the verified path for PTK bridge visibility. Set `TESTMU_PLAYWRIGHT_CONNECT_MODE=playwright` only when diagnosing native TestMu Playwright behavior.
-
-## BrowserStack
-
-Install:
-
-```bash
-npm install -D pentestkit playwright puppeteer-core selenium-webdriver
-```
-
-Required credentials:
-
-```bash
-export BROWSERSTACK_USERNAME=...
-export BROWSERSTACK_ACCESS_KEY=...
-```
-
-Selenium uses the bundled, provenance-checked CRX embedded in Chrome capabilities:
-
-```js
-import { withPtkScan } from "pentestkit/selenium";
-import { connectBrowserStackSelenium } from "pentestkit/providers/browserstack";
-
-const cloud = await connectBrowserStackSelenium({
-  build: "PTK Selenium Build",
-  name: "PTK Selenium"
-});
-
-try {
-  await withPtkScan(cloud.driver, {
-    project: "browserstack-selenium",
-    engines: ["DAST", "SAST", "IAST", "SCA"],
-    deferStart: true,
-    resultsDir: ".ptk/results/browserstack-selenium"
-  }, async ({ driver, startPtkScan }) => {
-    await driver.get("https://your-approved-target.example/#/");
-    await startPtkScan();
-
-    // Existing test steps continue here.
-    await driver.get("https://your-approved-target.example/#/search?q=test");
-  });
-} finally {
-  await cloud.close();
-}
-```
-
-Playwright and Puppeteer helpers remain available for BrowserStack CDP
-diagnostics. BrowserStack's documented Chrome extension flow uploads a ZIP
-through `automate/upload-media`, then passes the returned `media://...` value
-in the top-level `browserstack.uploadMedia` capability. In the 2026-07-27 live
-matrix those sessions started but PTK was not loaded, so these paths are not
-advertised as supported. The exact documented Windows 10 Playwright contract
-also installed zero targets for a harmless minimal MV3 control extension, so
-the observed failure is not specific to PTK. BrowserStack does not currently
-document this extension flow for Puppeteer. To reproduce the provider
-limitation, let the helper
-upload the packaged PTK ZIP:
-
-```bash
-export BROWSERSTACK_UPLOAD_EXTENSION=1
-```
-
-To reuse an existing BrowserStack upload:
-
-```bash
-export BROWSERSTACK_MEDIA_URL=media://...
-```
-
-Advanced users can still provide a preloaded websocket endpoint:
-
-```bash
-export BROWSERSTACK_PLAYWRIGHT_WS_ENDPOINT=wss://...
-export BROWSERSTACK_PUPPETEER_WS_ENDPOINT=wss://...
-```
-
-Set `BROWSERSTACK_REQUIRE_EXTENSION=false` only when you intentionally connect to a session that does not load PTK.
-
-BrowserStack's extension-testing documentation uses CDP mode for Playwright.
-The diagnostic helper follows that by default; set
-`BROWSERSTACK_PLAYWRIGHT_CONNECT_MODE=playwright` only for native-protocol
-diagnostics.
-
-Packaged examples:
-
-```bash
-node node_modules/pentestkit/providers/browserstack/examples/selenium-juice-shop.mjs
-```
-
-## Browserbase
-
-Install:
-
-```bash
-npm install -D pentestkit playwright puppeteer-core selenium-webdriver
-```
-
-Required credentials:
-
-```bash
-export BROWSERBASE_API_KEY=...
-```
-
-`BROWSERBASE_PROJECT_ID` is optional; Browserbase can infer the project from
-the API key when the account permits it.
-
-Browserbase uploads the packaged ZIP and returns an extension id. Reuse an existing id with `BROWSERBASE_EXTENSION_ID`.
+Provider connectors return a page or driver plus an idempotent `close()` method:
 
 ```js
 import { withPtkScan } from "pentestkit/playwright";
@@ -293,22 +36,48 @@ const cloud = await connectBrowserbasePlaywright();
 
 try {
   await withPtkScan(cloud.page, {
-    project: "browserbase-playwright",
+    project: "cloud-security-check",
     engines: ["DAST", "SAST", "IAST", "SCA"],
     deferStart: true,
-    resultsDir: ".ptk/results/browserbase-playwright"
+    resultsDir: ".ptk/results/cloud-security-check"
   }, async ({ page, startPtkScan }) => {
-    await page.goto("https://your-approved-target.example/", { waitUntil: "domcontentloaded" });
+    await page.goto(process.env.PTK_PROVIDER_TARGET_URL, {
+      waitUntil: "domcontentloaded"
+    });
+
     await startPtkScan();
 
-    await page.goto("https://your-approved-target.example/#/search?q=test", { waitUntil: "domcontentloaded" });
+    // Continue the authorised, same-origin application journey here.
   });
 } finally {
   await cloud.close();
 }
 ```
 
-Packaged examples:
+Starting PTK after the first application document is available lets the helper bind the session to the correct origin. Same-origin child routes remain eligible; unrelated external navigation is rejected.
+
+## Provider Summary
+
+| Provider | Required variables | Additional package | Supported frameworks |
+| --- | --- | --- | --- |
+| Browserbase | `BROWSERBASE_API_KEY` | None | Playwright, Puppeteer, Selenium |
+| Browserless | `BROWSERLESS_API_KEY`, `BROWSERLESS_EXTENSION_NAME` | None | Playwright, Puppeteer |
+| BrowserStack | `BROWSERSTACK_USERNAME`, `BROWSERSTACK_ACCESS_KEY` | None | Selenium |
+| Hyperbrowser | `HYPERBROWSER_API_KEY` | `@hyperbrowser/sdk` | Playwright, Puppeteer; Selenium is limited |
+| Steel | `STEEL_API_KEY` | `steel-sdk` | Playwright, Puppeteer |
+| TestMu | `LT_USERNAME`, `LT_ACCESS_KEY` | `@testmuai/testmu-cloud` | Playwright, Puppeteer, Selenium |
+
+## Browserbase
+
+Browserbase accepts a Chromium extension ZIP and makes the resulting extension ID available to Playwright, Puppeteer, and Selenium sessions.
+
+```bash
+export BROWSERBASE_API_KEY=...
+```
+
+`BROWSERBASE_PROJECT_ID` is optional when Browserbase can infer the project from the API key. Set `BROWSERBASE_EXTENSION_ID` to reuse PTK Auto that is already uploaded to the same account.
+
+Run the packaged examples:
 
 ```bash
 node node_modules/pentestkit/providers/browserbase/examples/playwright-juice-shop.mjs
@@ -316,211 +85,139 @@ node node_modules/pentestkit/providers/browserbase/examples/puppeteer-juice-shop
 node node_modules/pentestkit/providers/browserbase/examples/selenium-juice-shop.mjs
 ```
 
-Useful env vars:
-
-- `BROWSERBASE_EXTENSION_ID`
-- `BROWSERBASE_REGION`
-- `BROWSERBASE_TIMEOUT_SECONDS`
-- `BROWSERBASE_SELENIUM_SCRIPT_TIMEOUT_MS` (default `120000`; keeps PTK stop/export inside the remote async-script command)
-- `PTK_EXTENSION_UPLOAD_CACHE`
+See [Browserbase browser extensions](https://docs.browserbase.com/platform/browser/core-features/browser-extensions) and [Browserbase Selenium](https://docs.browserbase.com/welcome/quickstarts/selenium).
 
 ## Browserless
 
-Install:
-
-```bash
-npm install -D pentestkit playwright puppeteer-core
-```
-
-Required credentials:
+Upload the packaged Chromium PTK Auto ZIP in the Browserless dashboard, then use its assigned name:
 
 ```bash
 export BROWSERLESS_API_KEY=...
-export BROWSERLESS_EXTENSION_NAME=...
+export BROWSERLESS_EXTENSION_NAME=ptk-auto
 ```
 
-`BROWSERLESS_TOKEN` is accepted as an alias for `BROWSERLESS_API_KEY`. The extension must already be uploaded in Browserless; the helper passes it through `launch.extensions`.
+`BROWSERLESS_TOKEN` is accepted as an alias for `BROWSERLESS_API_KEY`.
 
-Use the default timeout unless your Browserless plan documents a higher limit. The verification run passed with `BROWSERLESS_TIMEOUT_MS=60000`; a larger timeout was rejected by the provider account used for testing.
-
-```js
-import { withPtkScan } from "pentestkit/playwright";
-import { connectBrowserlessPlaywright } from "pentestkit/providers/browserless";
-
-const cloud = await connectBrowserlessPlaywright();
-
-try {
-  await withPtkScan(cloud.page, {
-    project: "browserless-playwright",
-    engines: ["DAST", "SAST", "IAST", "SCA"],
-    deferStart: true,
-    resultsDir: ".ptk/results/browserless-playwright"
-  }, async ({ page, startPtkScan }) => {
-    await page.goto("https://your-approved-target.example/", { waitUntil: "domcontentloaded" });
-    await startPtkScan();
-
-    await page.goto("https://your-approved-target.example/#/search?q=test", { waitUntil: "domcontentloaded" });
-  });
-} finally {
-  await cloud.close();
-}
-```
-
-Packaged examples:
+Run:
 
 ```bash
 node node_modules/pentestkit/providers/browserless/examples/playwright-juice-shop.mjs
 node node_modules/pentestkit/providers/browserless/examples/puppeteer-juice-shop.mjs
 ```
 
-Browserless v2 removed Selenium/WebDriver support. Its current extension path
-requires Chromium CDP through Playwright or Puppeteer, so the package does not
-offer a Browserless Selenium connector.
+Browserless extension sessions are Chromium-only. Browserless v2 does not provide Selenium/WebDriver, so there is no Browserless Selenium connector.
+
+See [Browserless browser extensions](https://docs.browserless.io/baas/features/browser-extensions).
+
+## BrowserStack
+
+The supported PTK Agent path on BrowserStack is Selenium with Chrome:
+
+```bash
+export BROWSERSTACK_USERNAME=...
+export BROWSERSTACK_ACCESS_KEY=...
+
+node node_modules/pentestkit/providers/browserstack/examples/selenium-juice-shop.mjs
+```
+
+The helper supplies the packaged PTK Auto CRX through Chrome capabilities and closes the remote session after export.
+
+Playwright and Puppeteer connector APIs remain available for advanced preloaded-session use, but they are not advertised as supported PTK Auto quick starts. A successful BrowserStack connection is not sufficient: `window.PTK_AGENT` must also be available in the target page.
+
+See [BrowserStack Selenium](https://www.browserstack.com/docs/automate/selenium/getting-started/nodejs) and [BrowserStack Playwright extension testing](https://www.browserstack.com/docs/automate/playwright/chrome-extension-testing).
 
 ## Hyperbrowser
 
-Install:
+Install the official SDK and set your API key:
 
 ```bash
-npm install -D pentestkit @hyperbrowser/sdk playwright puppeteer-core selenium-webdriver
-```
-
-Required credentials:
-
-```bash
+npm install -D @hyperbrowser/sdk
 export HYPERBROWSER_API_KEY=...
 ```
 
-The helper uploads the packaged Chromium automation ZIP through the official
-`extensions.create({ filePath, name })` SDK method, caches the returned id by
-account and immutable artifact hash, and supplies it to new sessions through
-`extensionIds`. Set `HYPERBROWSER_EXTENSION_ID` to reuse an extension that is
-already uploaded. Hyperbrowser requires the ZIP to contain `manifest.json` at
-its root and documents an 8 MB upload limit; the helper validates both the PTK
-artifact format and size before making a paid provider request.
-
-```js
-import { withPtkScan } from "pentestkit/playwright";
-import { connectHyperbrowserPlaywright } from "pentestkit/providers/hyperbrowser";
-
-const cloud = await connectHyperbrowserPlaywright();
-
-try {
-  await withPtkScan(cloud.page, {
-    project: "hyperbrowser-playwright",
-    engines: ["DAST", "SAST", "IAST", "SCA"],
-    deferStart: true,
-    resultsDir: ".ptk/results/hyperbrowser-playwright"
-  }, async ({ page, startPtkScan }) => {
-    await page.goto("https://your-approved-target.example/", { waitUntil: "domcontentloaded" });
-    await startPtkScan();
-
-    await page.goto("https://your-approved-target.example/#/search?q=test", { waitUntil: "domcontentloaded" });
-  });
-} finally {
-  await cloud.close();
-}
-```
-
-Packaged examples:
+PTK Agent uploads the Chromium ZIP and supplies the resulting ID when creating a session. Set `HYPERBROWSER_EXTENSION_ID` to reuse an existing upload.
 
 ```bash
 node node_modules/pentestkit/providers/hyperbrowser/examples/playwright-juice-shop.mjs
 node node_modules/pentestkit/providers/hyperbrowser/examples/puppeteer-juice-shop.mjs
-node node_modules/pentestkit/providers/hyperbrowser/examples/selenium-juice-shop.mjs
 ```
 
-Playwright and Puppeteer connect to the provider-returned `wsEndpoint` over
-Chromium CDP. Selenium uses `webdriverEndpoint` and attaches the short-lived
-`x-hyperbrowser-token` header to every WebDriver request. It retries only the
-provider's exact bounded `selenium server not ready` startup response. Hyperbrowser's current
-documentation asks customers to contact support for Selenium access, so do not
-treat that row as supported until it passes in the intended account. The
-2026-07-27 live account returned that same readiness response for all six
-bounded attempts; Playwright and Puppeteer both passed the complete PTK gate.
+The Selenium connector is limited because Hyperbrowser WebDriver access can require account enablement. Use it only after Hyperbrowser confirms Selenium availability for your account.
 
-Useful env vars:
-
-- `HYPERBROWSER_EXTENSION_ID`
-- `HYPERBROWSER_REQUEST_TIMEOUT_MS` (default SDK timeout `30000`)
-- `HYPERBROWSER_SELENIUM_SCRIPT_TIMEOUT_MS` (default `120000`)
-- `PTK_EXTENSION_UPLOAD_CACHE`
+See [Hyperbrowser browser extensions](https://www.hyperbrowser.ai/docs/sessions/extensions) and [Hyperbrowser Selenium](https://www.hyperbrowser.ai/docs/sessions/selenium).
 
 ## Steel
 
-Install:
+Install the Steel SDK and set your API key:
 
 ```bash
-npm install -D pentestkit steel-sdk playwright puppeteer-core selenium-webdriver
-```
-
-Required credentials:
-
-```bash
+npm install -D steel-sdk
 export STEEL_API_KEY=...
 ```
 
-Steel uploads the packaged ZIP and returns an extension id. Reuse an existing id with `STEEL_EXTENSION_ID`.
-The adapter uses the `steel-sdk@0.18.0` file-stream upload path; passing that
-SDK a raw ZIP `Buffer` causes it to recursively expand the bytes as multipart
-fields.
-
-```js
-import { withPtkScan } from "pentestkit/playwright";
-import { connectSteelPlaywright } from "pentestkit/providers/steel";
-
-const cloud = await connectSteelPlaywright();
-
-try {
-  await withPtkScan(cloud.page, {
-    project: "steel-playwright",
-    engines: ["DAST", "SAST", "IAST", "SCA"],
-    deferStart: true,
-    resultsDir: ".ptk/results/steel-playwright"
-  }, async ({ page, startPtkScan }) => {
-    await page.goto("https://your-approved-target.example/", { waitUntil: "domcontentloaded" });
-    await startPtkScan();
-
-    await page.goto("https://your-approved-target.example/#/search?q=test", { waitUntil: "domcontentloaded" });
-  });
-} finally {
-  await cloud.close();
-}
-```
-
-Packaged examples:
+PTK Agent uploads the Chromium ZIP and attaches the extension ID to Playwright or Puppeteer sessions. Set `STEEL_EXTENSION_ID` to reuse an existing upload.
 
 ```bash
 node node_modules/pentestkit/providers/steel/examples/playwright-juice-shop.mjs
 node node_modules/pentestkit/providers/steel/examples/puppeteer-juice-shop.mjs
-node node_modules/pentestkit/providers/steel/examples/selenium-juice-shop.mjs
 ```
 
-The Selenium helper implements Steel's documented `isSelenium` provisioning,
-adds the API-key and session-id headers to every W3C request, retries only the
-observed transient WebDriver-node startup refusal, and supplies the bundled
-CRX through ChromeDriver capabilities. Steel Cloud nevertheless installed zero
-extensions in both headless and headful live controls on 2026-07-27. Keep this
-example as a provider diagnostic; use Playwright or Puppeteer for PTK scans.
+Steel Selenium is not currently a supported PTK Auto path. Use Playwright or Puppeteer for PTK scans.
 
-Useful env vars:
+See [Steel browser extensions](https://docs.steel.dev/overview/extensions-api/overview), [Steel Playwright](https://docs.steel.dev/integrations/playwright), and [Steel Puppeteer](https://docs.steel.dev/integrations/puppeteer).
 
-- `STEEL_EXTENSION_ID`
-- `STEEL_UPLOAD_TIMEOUT_MS`
-- `STEEL_UPLOAD_MAX_RETRIES`
-- `STEEL_TIMEOUT_MS`
-- `STEEL_SELENIUM_URL` (defaults to the TLS endpoint `https://connect.steelbrowser.com/selenium`)
-- `STEEL_SELENIUM_SCRIPT_TIMEOUT_MS` (default `120000`)
-- `STEEL_SELENIUM_READINESS_TIMEOUT_MS` (default `45000`)
-- `PTK_EXTENSION_UPLOAD_CACHE`
+## TestMu
 
-## Provider Cache And Secrets
+Install the TestMu Browser Cloud SDK and set the credentials from your account:
 
-Provider upload IDs are cached under
-`.ptk/provider-cache/<provider>/scope-<opaque-account-fingerprint>/` by
-default. The path combines an irreversible account-context fingerprint with
-the packaged ZIP hash, so changing provider accounts cannot reuse another
-account's extension id. Do not commit provider cache files, credentials,
-browser profiles, generated CRX/XPI files, or CRX private keys.
+```bash
+npm install -D @testmuai/testmu-cloud
+export LT_USERNAME=...
+export LT_ACCESS_KEY=...
+```
 
-Use provider-native secret storage for credentials. The examples read credentials from environment variables and never hard-code access keys.
+For Playwright and Puppeteer, choose one extension source:
+
+```bash
+# Let the provider helper upload PTK Auto.
+export TESTMU_UPLOAD_EXTENSION=1
+```
+
+```bash
+# Or use a provider-accessible PTK Auto ZIP URL.
+export TESTMU_EXTENSION_CLOUD_URL=https://downloads.example/ptk-auto.zip
+```
+
+```bash
+# Or reuse an existing TestMu extension entry.
+export TESTMU_EXTENSION_ID=...
+```
+
+Selenium uses the packaged CRX and does not require an uploaded ZIP URL.
+
+```bash
+node node_modules/pentestkit/providers/testmu/examples/playwright-juice-shop.mjs
+node node_modules/pentestkit/providers/testmu/examples/puppeteer-juice-shop.mjs
+node node_modules/pentestkit/providers/testmu/examples/selenium-juice-shop.mjs
+```
+
+The helper tries the current TestMu SDK upload API first and uses the PTK transport fallback only for recognised upload-transport failures. Authentication and authorisation failures are returned directly.
+
+TestMu Cypress and k6 samples are available under `node_modules/pentestkit/providers/testmu/examples/`. They require their provider-specific runners; see the packaged example README before using them.
+
+See [TestMu browser extensions](https://www.testmuai.com/support/docs/browser-cloud-extensions/) and [TestMu Playwright](https://www.testmuai.com/support/docs/playwright-testing/).
+
+## Results And Provider Logs
+
+Cloud session recordings, console logs, network logs, screenshots, and PTK findings can contain application data. Enable only the provider diagnostics you need, restrict access in the provider dashboard, and apply a suitable retention policy.
+
+When reporting a problem, include:
+
+- provider, framework, and browser;
+- `pentestkit` version;
+- whether the provider dashboard shows PTK Auto loaded;
+- the redacted bridge or lifecycle error;
+- whether the target was provider-reachable;
+- whether session cleanup completed.
+
+Never include provider access keys, application credentials, cookies, authorisation headers, or unredacted replay data in a public issue.

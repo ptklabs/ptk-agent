@@ -1,91 +1,78 @@
-# PTK Agent
+# OWASP PTK Agent
 
-`ptk-agent` is the PTK Labs package repository for [OWASP Penetration Testing Kit](https://owasp.org/www-project-penetration-testing-kit/) automation SDKs and command-line automation.
+PTK Agent brings [OWASP Penetration Testing Kit](https://owasp.org/www-project-penetration-testing-kit/) security checks into browser automation, command-line scans, and CI/CD workflows.
 
-It owns npm and PyPI package source, framework wrappers, package documentation, examples, package smoke tests, and release staging for the agent packages.
+The npm package is named [`pentestkit`](https://www.npmjs.com/package/pentestkit). It includes the `ptk-scan` and `ptk-agent` commands, framework integrations, cloud-browser provider helpers, and the PTK Auto browser runtime for Chromium-family browsers and Firefox.
 
-## Repository Boundary
-
-This repository does not own the PTK browser extension source or browser-extension release flow. It consumes prebuilt PTK automation-extension artifacts from repo-root `dist/` when building npm or PyPI packages.
-
-Release automation downloads those artifacts from an exact `DenisPodgurskii/pentestkit` GitHub release tag. It requires the operator to supply the SHA-256 of `extension-provenance-automation.json`, then verifies that pin, every artifact hash and size, both browser manifests, and the `OWASP Penetration Testing Kit Automation` / `PTK Auto` identity before packaging anything. It never resolves a mutable `latest` release.
-
-Expected extension artifacts:
-
-```text
-dist/
-  chrome_<version>_automation.zip
-  firefox_<version>_automation.zip
-  ptk-latest-automation.crx
-  ptk-latest-automation.xpi
-  extension-provenance-automation.json
-```
-
-The npm tarball preserves four reviewed browser artifacts under stable names:
-
-```text
-extensions/ptk-latest.zip             # Chromium MV3 ZIP
-extensions/ptk-latest-firefox.zip     # Firefox MV2 ZIP
-extensions/ptk-latest.crx             # Chrome Web Store CRX
-extensions/ptk-latest.xpi             # AMO-signed Firefox XPI
-```
-
-The ZIPs are the reviewed browser-specific upload/source archives. The CRX and
-XPI are downloaded from their stores, not generated on the npm user's machine.
-All four files are hash-pinned in extension provenance and must contain the
-same version and browser-specific manifest as their corresponding release
-artifact. None may contain `dev.local.json`.
-
-Generated release packages, browser profiles, virtualenvs, caches, traces, and scan artifacts must stay out of source control.
-
-## Source Layout
-
-| Directory | Contents |
-| --- | --- |
-| `npm/` | npm workspace, Agent CLI, shared browser helpers, Playwright/Selenium/Cypress/Puppeteer wrappers, provider helpers, package scripts, and npm smoke tests. |
-| `pypi/` | Python package sources for `pentestkit`, core helpers, Playwright helpers, Selenium helpers, and PyPI package smoke tests. |
-| `docs/npm/` | Public npm package documentation staged into the npm package. |
-| `docs/pypi/` | Public PyPI package documentation staged into Python packages. |
-
-## Common Checks
-
-Run npm package checks:
+## Install
 
 ```bash
-cd npm
-npm run preflight:release-frameworks
-npm run test:release-package
-npm run test:release-frameworks -- --mode package
+npm install -D pentestkit
 ```
 
-Run Python package smoke/import checks:
+Install the Playwright browser used by the default scanner:
 
 ```bash
-cd pypi
-python3 scripts/smoke_packages.py
+npx playwright install chromium
 ```
 
-Build release packages from repo-root extension artifacts:
+## First Scan
+
+Only scan applications you own or are explicitly authorised to test.
 
 ```bash
-cd npm
-npm run build:npm:release
-
-cd ../pypi
-python3 scripts/build_pypi_package.py --extension-input-dir ../dist
+npx ptk-scan https://your-authorised-target.example \
+  --engine DAST,IAST,SAST,SCA \
+  --require-ptk-bridge \
+  --require-ptk-findings-export \
+  --wait-for-ptk-complete
 ```
 
-## npm Release Boundary
+PTK Agent starts a browser with PTK Auto, keeps navigation within the configured target scope, runs the selected engines, and writes the scan results to the configured output directory.
 
-The `pentestkit` npm package is built from this repository. The protected [npm release workflow](.github/workflows/npm-release.yml) supports only:
+To verify extension setup without starting a scan:
 
-- a prerelease such as `9.9.8-rc.1` under the `next` dist-tag
-- a matching final version such as `9.9.8` under the `latest` dist-tag
+```bash
+npx ptk-agent --doctor-extension
+```
 
-The workflow uses npm trusted publishing and the `npm-release` GitHub environment. It does not use an npm token. Configure the npm trusted publisher for repository `ptklabs/ptk-agent` and workflow filename `npm-release.yml` before the first publish.
+## Integrations
 
-Repository CI and the release workflow audit source contents for generated archives, private keys, environment files, and recognizable credentials. The `dist/` input directory and all generated release outputs remain ignored.
+Use PTK with an existing automation journey through:
+
+- Playwright: `pentestkit/playwright`
+- Puppeteer: `pentestkit/puppeteer`
+- Selenium: `pentestkit/selenium`
+- Cypress: `pentestkit/cypress`
+
+Cloud-browser helpers are available for Browserbase, Browserless, BrowserStack, Hyperbrowser, Steel, and TestMu. Framework availability differs by provider; check the [provider support matrix](docs/npm/provider-browser-matrix.md) before choosing a combination.
+
+## Documentation
+
+- [npm package guide](docs/npm/README.md)
+- [CLI reference](docs/npm/cli.md)
+- [Configuration](docs/npm/configuration.md)
+- [Authenticated scans](docs/npm/authenticated-scans.md)
+- [Framework integrations](docs/npm/frameworks.md)
+- [Cloud providers](docs/npm/providers.md)
+- [Extension loading](docs/npm/extension-loading.md)
+- [GitHub Actions](docs/npm/github-actions.md)
+- [SARIF output](docs/npm/sarif.md)
+- [MCP server](docs/npm/mcp-server.md)
+- [Troubleshooting](docs/npm/troubleshooting.md)
+
+## Security And Privacy
+
+PTK scan results can contain URLs, request metadata, page content, screenshots, and—when explicitly enabled—authentication or replay data. Treat scan outputs as sensitive security evidence: restrict access, redact before sharing, and apply an appropriate CI retention policy.
+
+Provider credentials should be supplied through environment variables or a CI secret manager. PTK configuration and examples use variable names rather than embedded credentials.
+
+## Contributing
+
+The Node.js implementation is under [`npm/`](npm/README.md). The Python implementation is under [`pypi/`](pypi/README.md). Run the checks documented in the relevant workspace before submitting a change.
+
+Please report security vulnerabilities through the repository's private security-advisory channel rather than a public issue.
 
 ## License
 
-This repository and its npm and Python packages declare [GNU Affero General Public License v3.0](LICENSE.txt) (`AGPL-3.0-only`). Denis Podgurskii remains the package author; PTK Labs is listed as a contributor and repository owner.
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE.txt) (`AGPL-3.0-only`). Denis Podgurskii is the package author; PTK Labs is the repository owner and a project contributor.

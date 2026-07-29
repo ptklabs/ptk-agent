@@ -1172,6 +1172,28 @@ function scanTextForSecrets(filePath, relativePath) {
   return errors;
 }
 
+function scanMarkdownForInternalGuidance(markdown, relativePath) {
+  const errors = [];
+  const forbidden = [
+    [/\bdo not commit\b/i, 'repository housekeeping'],
+    [/\bmust stay out of source control\b/i, 'repository housekeeping'],
+    [/(?:^|[\s`'"(])(?:\/[^\s`'")]+\/)?ptk-agent\/dist(?:\/|\b)/i, 'local source path'],
+    [/(?:^|[\s`'"(])(?:npm\/)?\.release(?:\/|\b)/i, 'local release path'],
+    [/extension-provenance-automation\.json/i, 'release provenance input'],
+    [/\bCRX private key\b/i, 'extension signing operation'],
+    [/\bprovider-cache\b/i, 'provider cache implementation'],
+    [/\baccount-context fingerprint\b/i, 'provider cache implementation'],
+    [/\brelease[- ]candidate (?:matrix|result|evidence)\b/i, 'release test evidence'],
+    [/\blive matrix\b/i, 'account-specific test evidence']
+  ];
+  for (const [pattern, kind] of forbidden) {
+    if (pattern.test(markdown)) {
+      errors.push(`${relativePath} exposes ${kind} in public documentation`);
+    }
+  }
+  return errors;
+}
+
 function verifyStagedPackage(stageRoot) {
   const errors = [];
   const rootReadmePath = path.join(stageRoot, 'README.md');
@@ -1189,6 +1211,7 @@ function verifyStagedPackage(stageRoot) {
     }
     if (relative.endsWith('.md')) {
       const markdown = fs.readFileSync(filePath, 'utf8');
+      errors.push(...scanMarkdownForInternalGuidance(markdown, relative));
       for (const link of findRelativeMarkdownLinks(markdown)) {
         const target = decodeURIComponent(link.split('#')[0]);
         const resolvedTarget = path.resolve(path.dirname(filePath), target);
@@ -1708,6 +1731,7 @@ module.exports = {
   resolvePackageVersionInfo,
   resolvePackageVersion,
   scanTextForSecrets,
+  scanMarkdownForInternalGuidance,
   shouldSkipPublicDocOrExample,
   validateExtensionManifests,
   verifyPackageJson,

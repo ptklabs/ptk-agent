@@ -35,6 +35,7 @@ const {
   rewriteNpmReadmeLinksForPackageRoot,
   resolvePackageVersionInfo,
   resolvePackageVersion,
+  scanMarkdownForInternalGuidance,
   scanTextForSecrets,
   shouldSkipPublicDocOrExample,
   verifyStagedPackage
@@ -331,6 +332,22 @@ test('staged package safety rejects relative Markdown links lost during packagin
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('public package documentation rejects internal operational guidance', () => {
+  assert.ok(
+    scanMarkdownForInternalGuidance(
+      'Do not commit generated profiles or the CRX private key from ptk-agent/dist.',
+      'docs/guide.md'
+    ).length >= 3
+  );
+  assert.deepEqual(
+    scanMarkdownForInternalGuidance(
+      'Treat scan results as sensitive: restrict access, redact before sharing, and apply a CI retention policy.',
+      'docs/security.md'
+    ),
+    []
+  );
 });
 
 test('framework release smoke selects both source extensions and package automation only', () => {

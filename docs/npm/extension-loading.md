@@ -1,165 +1,52 @@
-# Extension Loading
+# PTK Auto Extension Loading
 
-PTK scanning requires the PTK browser extension. The npm package bundles four reviewed automation-extension artifacts and provides helpers that resolve the browser-specific form required by each framework or provider.
+Browser scans require PTK Auto, the automation runtime for OWASP Penetration Testing Kit. The `pentestkit` package includes browser-specific builds and prepares the correct form for each supported local framework or cloud provider.
 
-## What Is Bundled
+For a normal installation, no separate extension download is required.
 
-The installed package contains:
-
-```text
-node_modules/pentestkit/extensions/
-  ptk-latest.zip
-  ptk-latest-firefox.zip
-  ptk-latest.crx
-  ptk-latest.xpi
-  manifests/
-    chromium-mv3.json
-    firefox-mv2.json
-  extension-provenance.json
-```
-
-`ptk-latest.zip` is the Chromium MV3 ZIP and `ptk-latest-firefox.zip` is the Firefox MV2 ZIP. `ptk-latest.crx` is the reviewed Chrome Web Store download and `ptk-latest.xpi` is the AMO-signed Firefox download. The dedicated automation entry points enable the runtime; none of these artifacts contains `dev.local.json`.
-
-The package does not ship an unpacked extension directory, CRX private keys, provider upload IDs, or cloud-hosted extension URLs. Every bundled artifact has its own SHA-256 in `extension-provenance.json`; the package helpers reject hash or manifest drift.
-
-## Helper API
-
-Use `pentestkit/extensions` when a framework or provider needs a concrete extension artifact:
-
-```js
-const {
-  ensurePtkCrx,
-  ensurePtkXpi,
-  ensureUnpackedPtkExtension,
-  resolvePtkCrxArtifact,
-  resolvePtkExtensionArtifact,
-  resolvePtkFirefoxZipArtifact,
-  resolvePtkXpiArtifact
-} = require("pentestkit/extensions");
-```
-
-| Helper | Produces | Typical use |
-| --- | --- | --- |
-| `resolvePtkExtensionArtifact()` | packaged Chromium `extensions/ptk-latest.zip` metadata | Chromium provider uploads that accept ZIP |
-| `resolvePtkFirefoxZipArtifact()` | packaged `extensions/ptk-latest-firefox.zip` metadata | Firefox provider uploads that accept ZIP |
-| `resolvePtkCrxArtifact()` | packaged, store-published `extensions/ptk-latest.crx` | Selenium/Grid capabilities that require CRX/base64 payloads |
-| `resolvePtkXpiArtifact()` | packaged, AMO-signed `extensions/ptk-latest.xpi` | Firefox installation and prepared profiles |
-| `ensureUnpackedPtkExtension()` | unpacked Chromium extension directory | local Playwright, Puppeteer, Selenium, Cypress setup |
-| `ensurePtkCrx()` | compatibility helper; normal installs resolve the bundled CRX | older/source packages without a release CRX |
-| `ensurePtkXpi()` | compatibility helper; normal installs resolve the bundled signed XPI | older/source packages without a release XPI |
-
-Only unpacked/cache derivatives are created during a normal install, always outside `node_modules`. The published CRX and signed XPI are never regenerated on the user's machine.
-
-## Cache Locations
-
-The default automation cache root is `.ptk` under the current working directory. Override it with either:
-
-```bash
-export PTK_EXTENSION_CACHE_DIR=/absolute/path/to/ptk-cache
-```
-
-or:
-
-```bash
-export PTK_AUTOMATION_CACHE_DIR=/absolute/path/to/ptk-cache
-```
-
-The helpers store generated files under that cache:
-
-```text
-.ptk/
-  extensions/
-    ptk-chromium-<version>-<zip-sha>/
-    ptk-chromium-<version>-<zip-sha>-<key-sha>.crx
-    ptk-firefox-<version>-<zip-sha>.xpi
-  provider-cache/
-    <provider>/
-      zip-<zip-sha>.json
-```
-
-Do not commit `.ptk`, generated extension artifacts, provider upload cache files, browser profiles, or private keys.
-
-Provider upload helpers use `PTK_EXTENSION_UPLOAD_CACHE`:
-
-| Value | Behavior |
-| --- | --- |
-| `reuse` or unset | reuse cached provider extension IDs for the same artifact hash |
-| `refresh` | ignore the cached upload and write a new cache entry |
-| `off` | do not read or write provider upload cache files |
-
-## Verify Resolution
+## Check Your Installation
 
 ```bash
 npx ptk-agent --doctor-extension
 ```
 
-Expected npm install result:
+A registry installation normally reports:
 
 ```json
 {
-  "source": "bundled-package",
-  "kind": "unpacked-directory"
+  "source": "bundled-package"
 }
 ```
 
-The diagnostic also reports the resolved path, extension version, manifest version, and provenance when available.
+The diagnostic also reports the selected browser format and extension version. If it reports an explicit or environment override, unset that override to return to the packaged PTK Auto build.
 
-## Format Choice
+## Browser Formats
 
-Use the smallest format that your runner/provider accepts:
+The package contains four PTK Auto browser formats because browser APIs accept different package types:
 
-| Situation | Recommended artifact |
+| File type | Used for |
 | --- | --- |
-| Local Playwright Chromium | generated unpacked directory |
-| Local Puppeteer Chromium | generated unpacked directory |
-| Local Selenium Chromium with `--load-extension` | generated unpacked directory |
-| Selenium/Grid `goog:chromeOptions.extensions` | bundled, provenance-checked CRX, base64 encoded by the provider helper |
-| Cypress Chromium-family runs | Cypress run-local unpacked copy generated by `setupPtkCypress()` |
-| TestMu Playwright/Puppeteer | provider-hosted ZIP URL or explicit upload from packaged ZIP |
-| TestMu Selenium | bundled CRX embedded in Selenium capabilities |
-| BrowserStack Selenium | bundled CRX embedded in Selenium capabilities |
-| BrowserStack Playwright/Puppeteer | preloaded session or provider-specific extension capability value |
-| Browserbase | uploaded ZIP, cached as an extension ID |
-| Hyperbrowser Playwright/Puppeteer/Selenium | uploaded ZIP, cached as an extension ID and passed in session `extensionIds` |
-| Steel Playwright/Puppeteer | uploaded ZIP, cached as an extension ID |
-| Steel Selenium diagnostic | uploaded extension ID plus bundled CRX; current Steel Cloud nodes install neither |
-| Firefox prepared profile or temporary add-on install | bundled AMO-signed XPI |
+| Chromium ZIP | Local unpacked loading and provider uploads that accept ZIP files. |
+| Firefox ZIP | Provider uploads that require a Firefox ZIP. |
+| Chrome Web Store CRX | Selenium/Grid capabilities and platforms that require a packaged Chromium extension. |
+| Signed Firefox XPI | Firefox profiles and APIs that install signed add-ons. |
 
-If a cloud provider already preinstalls PTK in the browser/profile, connect normally and pass the provider page or driver to the framework helper.
+The framework and provider helpers choose a format automatically. Users should not convert the Chromium ZIP into a Firefox package, or the Firefox ZIP into a Chromium package; their manifests and browser permissions differ.
 
-## Resolution Order
+## Local Browser Support
 
-PTK resolves the extension in this order:
+| Browser | Recommended setup |
+| --- | --- |
+| Chromium | Automatic unpacked loading through the CLI or framework helper. |
+| Microsoft Edge | Automatic unpacked loading through the Chromium integration. |
+| Google Chrome | Use the normal Chromium integration when local policy permits extension loading; otherwise use Edge, Chromium, or a prepared Chrome profile. |
+| Firefox | Use a dedicated profile with the signed PTK Auto XPI installed. |
 
-1. explicit CLI/config extension path, such as `--ptk-extension-dir`
-2. `PTK_EXTENSION_DIR`
-3. `PTK_EXTENSION_PATH`
-4. bundled package extension
-5. source-tree local-dev fallback, only for repository development or when explicitly allowed
+Do not reuse a profile that is already open in another browser process. For unattended CI, use a dedicated automation profile rather than a personal browsing profile.
 
-If both `PTK_EXTENSION_DIR` and `PTK_EXTENSION_PATH` are set, `PTK_EXTENSION_DIR` wins.
+## Framework Helpers
 
-## Explicit Overrides
-
-Use explicit paths when testing a local extension build or a prepared profile workflow:
-
-```bash
-PTK_EXTENSION_DIR=/absolute/path/to/unpacked-extension \
-npx ptk-agent --doctor-extension
-```
-
-or:
-
-```bash
-npx ptk-scan https://target.example \
-  --ptk-extension-dir /absolute/path/to/unpacked-extension
-```
-
-`PTK_EXTENSION_DIR` must point to an unpacked extension directory containing `manifest.json`. `PTK_EXTENSION_PATH` may point to an unpacked directory or explicit extension artifact. Prefer package helpers for normal npm installs.
-
-## Generated Unpacked Extension
-
-Most local Chromium-family automation uses an unpacked extension directory:
+Local Playwright and Puppeteer integrations can request an unpacked Chromium directory:
 
 ```js
 const { ensureUnpackedPtkExtension } = require("pentestkit/extensions");
@@ -168,92 +55,74 @@ const extension = ensureUnpackedPtkExtension();
 console.log(extension.path);
 ```
 
-The helper validates the packaged ZIP, extracts it into the automation cache, writes a marker for the source artifact hash, and reuses the cache when the ZIP has not changed.
+Cloud providers normally do not need this call; use the provider helper, which supplies the browser format expected by that platform.
 
-## Bundled CRX
-
-CRX is needed only when the browser platform requires an installable Chromium extension file, such as Selenium/Grid `goog:chromeOptions.extensions`. It is not the default for local Playwright or Puppeteer.
-
-The published package includes the reviewed release CRX. Resolve it without
-running Chrome or creating a key on the user machine:
+The main extension resolver APIs are:
 
 ```js
-const { resolvePtkCrxArtifact } = require("pentestkit/extensions");
-
-const crx = resolvePtkCrxArtifact();
-console.log(crx.path);
+const {
+  ensureUnpackedPtkExtension,
+  resolvePtkCrxArtifact,
+  resolvePtkExtensionArtifact,
+  resolvePtkFirefoxZipArtifact,
+  resolvePtkXpiArtifact
+} = require("pentestkit/extensions");
 ```
 
-`resolvePtkCrxArtifact()` verifies the CRX hash against package provenance.
-`ensurePtkCrx()` returns the same bundled CRX in current packages. Its local
-generation path is retained only for compatibility with older/source packages.
-
-```js
-const { ensurePtkCrx } = require("pentestkit/extensions");
-
-const crx = ensurePtkCrx();
-console.log(crx.path);
-console.log(crx.keyPath);
-```
-
-Legacy CRX generation uses a local Chrome/Chromium binary with `--pack-extension`. If no key exists, Chrome generates one locally. The default key path is:
-
-```text
-.ptk/keys/ptk-automation-crx.pem
-```
-
-Set `PTK_CRX_KEY` to use a user-managed key:
-
-```bash
-export PTK_CRX_KEY=/secure/path/ptk-automation-crx.pem
-```
-
-Use a stable private key when you need a stable Chromium extension id across generated CRX files. Never commit or publish the private key. If a private key is shipped in npm or GitHub, anyone can generate CRXs with the same extension id.
-
-## Bundled Signed XPI
-
-XPI is for Firefox installation and prepared-profile workflows. Resolve the
-AMO-signed artifact directly from the package:
-
-```js
-const { resolvePtkXpiArtifact } = require("pentestkit/extensions");
-
-const xpi = resolvePtkXpiArtifact();
-console.log(xpi.path);
-```
-
-For Firefox profile setup, copy the bundled signed XPI:
-
-```bash
-mkdir -p "$HOME/profiles/ptk/firefox/extensions"
-node -e 'const { resolvePtkXpiArtifact } = require("pentestkit/extensions"); console.log(resolvePtkXpiArtifact().path)' > /tmp/ptk-xpi-path
-cp "$(cat /tmp/ptk-xpi-path)" \
-  "$HOME/profiles/ptk/firefox/extensions/ptk-automation-agent@ptklabs.com.xpi"
-```
-
-Then launch Firefox with that dedicated profile. The signed XPI is the
-dedicated PTK Auto distribution and does not require enabling the full
-extension's manual Automation Mode setting.
-
-## Browser Notes
-
-| Browser | NPM package behavior |
+| Helper | Result |
 | --- | --- |
-| Chromium | Best default. Unpacks the bundled ZIP into the automation cache. |
-| Edge | Uses the same generated unpacked extension when Edge is available and selected. |
-| Chrome | May require Chrome for Testing or a prepared profile depending on local Chrome policy. |
-| Firefox | Uses the bundled signed XPI/profile workflows. Some direct Agent SDK Firefox paths fail clearly until supported. |
+| `ensureUnpackedPtkExtension()` | An unpacked Chromium extension directory. |
+| `resolvePtkExtensionArtifact()` | The packaged Chromium ZIP. |
+| `resolvePtkFirefoxZipArtifact()` | The packaged Firefox ZIP. |
+| `resolvePtkCrxArtifact()` | The store-published Chromium CRX. |
+| `resolvePtkXpiArtifact()` | The signed Firefox XPI. |
 
-## Automation Mode
+## Custom Extension Builds
 
-The dedicated PTK Auto artifacts use their automation background entry points and are ready for an authorised controller without `dev.local.json` or a manual settings change. A profile containing the separate full PTK extension still requires that extension's Automation Mode setting; do not confuse that legacy/full-profile case with the bundled PTK Auto XPI.
+Most users should use the bundled extension. To test a custom unpacked Chromium build, supply an absolute directory containing `manifest.json`:
 
-## Provenance
-
-The package includes:
-
-```js
-const provenance = require("pentestkit/extensions/provenance");
+```bash
+PTK_EXTENSION_DIR=/absolute/path/to/custom-ptk-auto \
+  npx ptk-agent --doctor-extension
 ```
 
-Use it to check extension hashes, package version, artifact source, and manifest versions.
+or for one scan:
+
+```bash
+npx ptk-scan https://your-authorised-target.example \
+  --ptk-extension-dir /absolute/path/to/custom-ptk-auto
+```
+
+`PTK_EXTENSION_DIR` takes precedence over `PTK_EXTENSION_PATH`. Remove both variables when diagnosing the installed package.
+
+A custom extension is outside the package's tested compatibility contract. Confirm that it is PTK Auto, that Automation Mode is active, and that its protocol version is compatible with your installed `pentestkit` version.
+
+## Cloud Providers
+
+Remote platforms load extensions differently. Some upload a ZIP and return an extension ID; others accept a CRX in session capabilities or require an extension already present in the remote profile. The provider helpers hide those differences where the platform supports them.
+
+Do not assume that a provider's general Playwright, Puppeteer, or Selenium support also means it supports extensions in that framework. Check the [provider support matrix](provider-browser-matrix.md) and the provider's official documentation.
+
+## Common Problems
+
+### The PTK bridge is missing
+
+1. Run `npx ptk-agent --doctor-extension`.
+2. Try a headed Chromium run so extension startup is visible.
+3. Close other browser processes using the same profile.
+4. For Firefox, confirm that the signed XPI is installed in the profile.
+5. For a cloud provider, confirm that the selected provider/framework combination supports browser extensions.
+
+### An environment override is selected unexpectedly
+
+```bash
+unset PTK_EXTENSION_DIR
+unset PTK_EXTENSION_PATH
+npx ptk-agent --doctor-extension
+```
+
+### A browser starts but no scan is recorded
+
+Use `--require-ptk-bridge` and `--require-ptk-findings-export` so the run fails explicitly instead of returning an apparently successful browser journey without PTK evidence.
+
+See [troubleshooting](troubleshooting.md) for additional checks.

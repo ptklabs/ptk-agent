@@ -127,18 +127,3 @@ npx ptk-agent-mcp-server --stdio --include-unsafe
 
 Do not expose unsafe tools to general-purpose model clients.
 
-## Manual Protocol Smoke
-
-You can smoke-test the stdio protocol by sending newline-delimited JSON-RPC:
-
-```bash
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"manual","version":"0.0.0"}}}' \
-  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' \
-  '{"jsonrpc":"2.0","id":3,"method":"shutdown"}' \
-  | npx ptk-agent-mcp-server --stdio
-```
-
-Each response on stdout should be one JSON-RPC message. Startup diagnostics should appear on stderr.
-

@@ -2,7 +2,11 @@
 
 `pentestkit/browser` contains the framework-neutral PTK lifecycle helpers used by the Playwright, Selenium, and Puppeteer adapters. Most users should import the framework-specific subpath, but this module is useful when a browser provider exposes a Playwright-like page object with `evaluate()`.
 
-Install `pentestkit` from the registry or from a local source-built tarball. Both paths expose the same `pentestkit/browser` package subpath.
+Install `pentestkit` from the npm registry:
+
+```bash
+npm install -D pentestkit
+```
 
 ## Page Contract
 

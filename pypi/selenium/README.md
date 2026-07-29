@@ -1,11 +1,10 @@
 # ptk-selenium Source
 
-This directory contains the internal source for the `ptk-selenium` implementation package. Public package documentation is maintained in `ptk-agent/docs/pypi/selenium.md` for the `pentestkit.selenium` import surface.
+This directory implements the `pentestkit.selenium` integration. Public usage is documented in [the Selenium guide](../../docs/pypi/selenium.md).
 
 ## Source Setup
 
 ```bash
-cd ptk-agent/pypi/selenium
 pip install -e .
 ```
 
@@ -27,11 +26,11 @@ export PTK_EXTENSION_XPI_PATH=/path/to/ptk-latest.xpi
 
 - `src/ptk_selenium/`: public package source
 - `examples/`: short examples that demonstrate the reusable API
-- `smoke/`: release-gated Juice Shop flow with engine/finding checks
+- `smoke/`: Juice Shop integration checks
 - `tests/`: package unit tests
 - `pyproject.toml`: package metadata and published README path
 
-Public examples should stay small. Add comprehensive release validation to `smoke/`.
+Public examples should stay small and demonstrate the supported package API.
 
 ## Smoke
 
@@ -47,7 +46,7 @@ JUICE_SHOP_URL=http://127.0.0.1:3001 \
 Run package compile/import/wheel smoke from the PyPI SDK root:
 
 ```bash
-cd ptk-agent/pypi
+cd pypi
 python scripts/smoke_packages.py
 ```
 

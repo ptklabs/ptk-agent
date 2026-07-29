@@ -8,19 +8,13 @@ Install either Puppeteer package in the project that runs the test:
 npm install -D pentestkit puppeteer
 ```
 
-For a local source-built package, build the tarball from `ptk-agent/npm` and install it instead:
-
-```bash
-npm install -D /path/to/ptk-agent/npm/.release/npm/pentestkit-*.tgz puppeteer
-```
-
 or, when you provide a Chrome/Chromium executable yourself:
 
 ```bash
 npm install -D pentestkit puppeteer-core
 ```
 
-Both install paths use the same import:
+Use the public package import:
 
 ```js
 const { launchPtkBrowser, withPtkScan } = require("pentestkit/puppeteer");
