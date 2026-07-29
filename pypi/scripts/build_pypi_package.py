@@ -28,7 +28,7 @@ SDIST_SUFFIXES = [
     f"src/pentestkit/extensions/{smoke_packages.PACKAGE_XPI_FILE}",
     f"src/pentestkit/extensions/{smoke_packages.PACKAGE_FIREFOX_XPI_FILE}",
     f"src/pentestkit/extensions/{smoke_packages.PACKAGE_PROVENANCE_FILE}",
-    f"src/pentestkit/extensions/chromium-unpacked/{smoke_packages.DEV_LOCAL_CONFIG_FILE}",
+    "src/pentestkit/extensions/chromium-unpacked/manifest.json",
 ]
 
 
@@ -115,6 +115,18 @@ def read_tar_json(archive, suffix):
     return json.loads(handle.read().decode("utf8"))
 
 
+def read_tar_optional_json(archive, suffix):
+    members = [member for member in archive.getmembers() if member.name.endswith(suffix)]
+    if not members:
+        return None
+    if len(members) != 1:
+        raise RuntimeError(f"Expected at most one sdist member ending with {suffix}, found {len(members)}")
+    handle = archive.extractfile(members[0])
+    if handle is None:
+        raise RuntimeError(f"Could not read sdist member: {members[0].name}")
+    return json.loads(handle.read().decode("utf8"))
+
+
 def read_tar_bytes(archive, suffix):
     members = [member for member in archive.getmembers() if member.name.endswith(suffix)]
     if len(members) != 1:
@@ -153,7 +165,11 @@ def verify_pentestkit_sdist(sdist_path):
             archive,
             f"src/pentestkit/extensions/{smoke_packages.PACKAGE_PROVENANCE_FILE}",
         )
-        dev_local = read_tar_json(
+        unpacked_manifest = read_tar_json(
+            archive,
+            "src/pentestkit/extensions/chromium-unpacked/manifest.json",
+        )
+        unpacked_dev_local = read_tar_optional_json(
             archive,
             f"src/pentestkit/extensions/chromium-unpacked/{smoke_packages.DEV_LOCAL_CONFIG_FILE}",
         )
@@ -162,7 +178,13 @@ def verify_pentestkit_sdist(sdist_path):
             f"src/pentestkit/extensions/{smoke_packages.PACKAGE_CHROMIUM_ZIP_FILE}",
         )
         with zipfile.ZipFile(io.BytesIO(chromium_zip_bytes)) as extension_zip:
-            zip_dev_local = json.loads(extension_zip.read(smoke_packages.DEV_LOCAL_CONFIG_FILE).decode("utf8"))
+            zip_manifest = json.loads(extension_zip.read("manifest.json").decode("utf8"))
+            try:
+                zip_dev_local = json.loads(
+                    extension_zip.read(smoke_packages.DEV_LOCAL_CONFIG_FILE).decode("utf8")
+                )
+            except KeyError:
+                zip_dev_local = None
     if "GNU AFFERO GENERAL PUBLIC LICENSE" not in license_text:
         raise RuntimeError("pentestkit sdist does not bundle the GNU AGPL license text")
     if f"License: {smoke_packages.EXPECTED_LICENSE}" not in package_metadata:
@@ -171,14 +193,12 @@ def verify_pentestkit_sdist(sdist_path):
         raise RuntimeError("pentestkit sdist metadata does not include the AGPL classifier")
     if provenance.get("automationEnabledDefault") is not True:
         raise RuntimeError("pentestkit sdist extension provenance does not mark automationEnabledDefault: true")
-    if dev_local.get("automationEnabled") is not True:
-        raise RuntimeError("pentestkit sdist Chromium extension does not enable automation by default")
-    if dev_local.get("automationAllowChildFrameBootstrap") is True:
-        raise RuntimeError("pentestkit sdist Chromium extension must not enable child-frame bootstrap globally")
-    if zip_dev_local.get("automationEnabled") is not True:
-        raise RuntimeError("pentestkit sdist Chromium ZIP does not enable automation by default")
-    if zip_dev_local.get("automationAllowChildFrameBootstrap") is True:
-        raise RuntimeError("pentestkit sdist Chromium ZIP must not enable child-frame bootstrap globally")
+    smoke_packages.validate_automation_artifact(
+        "pentestkit sdist Chromium extension", unpacked_manifest, unpacked_dev_local
+    )
+    smoke_packages.validate_automation_artifact(
+        "pentestkit sdist Chromium ZIP", zip_manifest, zip_dev_local
+    )
 
 
 def copy_stage(staging_root, extension_input_dir):

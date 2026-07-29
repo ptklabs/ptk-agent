@@ -1,0 +1,114 @@
+name: PTK Action Source Package Smoke
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ptk-agent-action-smoke-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  action-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      BASE_PACKAGE_VERSION: 9.9.8
+    steps:
+      - name: Check out PTK Agent
+        uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Install package build dependencies
+        run: |
+          npm ci --ignore-scripts --prefix npm
+          npm ci --ignore-scripts --prefix npm/agents
+
+      - name: Acquire the released automation artifacts
+        run: |
+          npm install \
+            --prefix npm/.release/action-base \
+            --ignore-scripts \
+            --no-audit \
+            --no-fund \
+            --package-lock=false \
+            "pentestkit@$BASE_PACKAGE_VERSION"
+          node npm/scripts/prepare-action-smoke-input.cjs \
+            npm/.release/action-base/node_modules/pentestkit \
+            npm/.release/action-input
+
+      - name: Build current source as a local pentestkit tarball
+        run: |
+          node npm/scripts/prepare-npm-package.cjs \
+            --artifact-source automation-artifact \
+            --input-dir npm/.release/action-input \
+            --out-dir npm/.release/action-package \
+            --package-version "$BASE_PACKAGE_VERSION" \
+            --publishable \
+            --skip-smoke
+          test -f "npm/.release/action-package/pentestkit-${BASE_PACKAGE_VERSION}.tgz"
+
+      - name: Start in-scope action test application
+        run: |
+          node npm/fixtures/action-smoke-app/server.cjs > "$RUNNER_TEMP/ptk-agent-action-fixture.log" 2>&1 &
+          echo $! > "$RUNNER_TEMP/ptk-agent-action-fixture.pid"
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:4173/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
+
+      - name: Scan current Agent source through the published Action
+        id: ptk
+        uses: ptklabs/ptk-action@v1 # Intentionally exercise the maintained first-party v1 release.
+        with:
+          target: http://127.0.0.1:4173/
+          engines: DAST,IAST,SAST,SCA
+          fail-on: none
+          pentestkit-version: ${{ env.BASE_PACKAGE_VERSION }}
+          pentestkit-package: npm/.release/action-package/pentestkit-${{ env.BASE_PACKAGE_VERSION }}.tgz
+          output-dir: npm/.release/action-run/artifacts
+          sarif-file: npm/.release/action-run/ptk-results.sarif
+          extra-args: |
+            --max-routes
+            8
+            --crawl-depth
+            2
+            --max-actions-per-route
+            4
+
+      - name: Assert current package PTK participation
+        run: |
+          node npm/scripts/assert-action-smoke.cjs \
+            "${{ steps.ptk.outputs.output-dir }}" \
+            "${{ steps.ptk.outputs.sarif-file }}"
+
+      - name: Upload current package smoke evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: ptk-agent-action-smoke
+          path: |
+            npm/.release/action-run/artifacts
+            npm/.release/action-run/ptk-results.sarif
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Stop test application
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/ptk-agent-action-fixture.pid"; then
+            kill "$(cat "$RUNNER_TEMP/ptk-agent-action-fixture.pid")" 2>/dev/null || true
+          fi

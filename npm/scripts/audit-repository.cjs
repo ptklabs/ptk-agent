@@ -116,7 +116,8 @@ function documentationAudienceFindings(filePath, relative) {
     ['extension signing operation', /\bCRX private key\b/i],
     ['provider cache implementation', /\b(?:provider-cache|account-context fingerprint)\b/i],
     ['account-specific test evidence', /\b(?:live matrix|release[- ]candidate (?:matrix|result|evidence))\b/i],
-    ['incorrect npm package identity', /@ptklabs\/agent\b/i]
+    ['incorrect npm package identity', /@ptklabs\/agent\b/i],
+    ['obsolete GitHub Action repository', /ptklabs\/owasp-ptk-action\b/i]
   ];
   for (const [label, pattern] of patterns) {
     if (pattern.test(text)) findings.push(`${label} in ${relative}`);

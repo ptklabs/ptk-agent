@@ -1,18 +1,14 @@
 # GitHub Actions
 
-OWASP PTK can run from the `pentestkit` npm package in GitHub Actions and publish SARIF to GitHub Code Scanning.
+The official [`ptklabs/ptk-action`](https://github.com/ptklabs/ptk-action)
+wrapper is the recommended way to run the `pentestkit` npm package in a GitHub
+Actions browser session. The Action runs PTK, preserves normal artifacts, and
+returns a SARIF path for an explicit GitHub Code Scanning upload.
 
-The core CI command is still `ptk-scan`:
+## Recommended workflow
 
-```bash
-npx ptk-scan http://localhost:3000 \
-  --engine DAST \
-  --format sarif \
-  --output ptk-results.sarif \
-  --fail-on high
-```
-
-## Local App DAST
+Start the application before the PTK step. The Action does not build or start
+your target.
 
 ```yaml
 name: PTK Security Scan
@@ -29,85 +25,94 @@ permissions:
 jobs:
   ptk:
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          package-manager-cache: false
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install browser
-        run: npx playwright install chromium --with-deps
-
-      - name: Run app
+      - name: Install and start the application
         run: |
-          npm run dev &
-          npx wait-on http://localhost:3000
+          npm ci
+          npm run start:test &
+          for attempt in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:3000 >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1
 
       - name: Run OWASP PTK
-        run: |
-          npx ptk-scan http://localhost:3000 \
-            --engine DAST \
-            --format sarif \
-            --output ptk-results.sarif \
-            --output-dir .ptk/artifacts \
-            --fail-on high
+        id: ptk
+        uses: ptklabs/ptk-action@v1
+        with:
+          target: http://127.0.0.1:3000
+          engines: DAST,IAST,SAST,SCA
+          fail-on: high
 
       - name: Upload PTK SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
+        if: always() && steps.ptk.outputs.sarif-file != ''
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
         with:
-          sarif_file: ptk-results.sarif
+          sarif_file: ${{ steps.ptk.outputs.sarif-file }}
           category: owasp-ptk
 
       - name: Upload PTK artifacts
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: ptk-artifacts
-          path: .ptk/artifacts
+          path: ${{ steps.ptk.outputs.output-dir }}
+          if-no-files-found: error
 ```
 
-## Existing Framework Tests
+The maintained `v1` tag follows compatible v1 releases. Pin
+`ptklabs/ptk-action` to a full release commit SHA when your dependency policy
+requires an immutable Action reference.
 
-If your Playwright, Puppeteer, Selenium, or Cypress tests already drive the app, keep that flow and wrap the relevant page/driver with the PTK framework helper. Store the PTK result files as build artifacts, and run a standalone `ptk-scan --format sarif` when you need GitHub Code Scanning output from the CLI.
+The Action's
+[README](https://github.com/ptklabs/ptk-action#readme) is the source of truth
+for supported runners, inputs, authentication, outputs, and complete examples.
 
-The package examples are under:
+## Direct CLI workflow
+
+Use the CLI directly when you need to control package installation and browser
+setup yourself:
+
+```bash
+npx playwright install chromium --with-deps
+xvfb-run --auto-servernum npx ptk-scan http://127.0.0.1:3000 \
+  --engines DAST,IAST,SAST,SCA \
+  --require-ptk-bridge \
+  --require-ptk-findings-export \
+  --wait-for-ptk-complete \
+  --require-ptk-attack-completion \
+  --format sarif \
+  --output ptk-results.sarif \
+  --output-dir .ptk/artifacts \
+  --fail-on high
+```
+
+PTK writes SARIF before applying the `--fail-on` threshold, so a workflow can
+upload the report from an `always()` step even when the security gate fails.
+
+## Existing framework tests
+
+If Playwright, Puppeteer, Selenium, or Cypress tests already drive your
+application, wrap the relevant page or driver with the PTK framework helper and
+store its result files as workflow artifacts. Run a standalone
+`ptk-scan --format sarif` when the same job also needs GitHub Code Scanning
+output.
+
+Package examples are installed under:
 
 ```text
 node_modules/pentestkit/examples/github-actions/
 ```
 
-Source examples:
-
-- `ptk-agent/npm/examples/github-actions/local-app-dast/`
-- `ptk-agent/npm/examples/github-actions/playwright-ptk/`
-- `ptk-agent/npm/examples/github-actions/sast-js/`
-
-## Official Action Wrapper
-
-The planned marketplace wrapper should be a composite action that installs `pentestkit`, maps its `target` input to `ptk-scan --url`, and leaves SARIF upload as an explicit workflow step:
-
-```yaml
-- name: Run OWASP PTK
-  uses: ptklabs/owasp-ptk-action@v1
-  with:
-    target: http://localhost:3000
-    engines: DAST
-    fail-on: high
-    sarif-file: ptk-results.sarif
-```
-
-The wrapper must not rename the CLI or own application startup. It should run `ptk-scan`, write SARIF before threshold failure, and let users upload with `github/codeql-action/upload-sarif`.
-
-## Caveats
+## Notes
 
 - Run PTK only against systems you own or are authorized to test.
-- `security-events: write` is required for SARIF upload.
-- Pull requests from forks may need workflow/security review before repository tokens can upload SARIF.
-- DAST findings are runtime findings; source locations appear only when PTK has source evidence.
+- `security-events: write` is required for Code Scanning SARIF upload.
+- Pull requests from forks may need workflow and token-policy review before
+  SARIF can be uploaded.
+- DAST findings are runtime findings; source locations appear only when PTK has
+  source evidence.

@@ -197,6 +197,42 @@ def read_zip_json(zip_path, name):
             return json.loads(handle.read().decode("utf8"))
 
 
+def read_zip_json_optional(zip_path, name):
+    with zipfile.ZipFile(zip_path) as archive:
+        try:
+            with archive.open(name) as handle:
+                return json.loads(handle.read().decode("utf8"))
+        except KeyError:
+            return None
+
+
+def uses_dedicated_automation_runtime(manifest):
+    background = manifest.get("background") if isinstance(manifest, dict) else None
+    if not isinstance(background, dict):
+        return False
+    if manifest.get("manifest_version") == 3:
+        return background.get("service_worker") == "app_automation.js"
+    if manifest.get("manifest_version") == 2:
+        return background.get("page") == "ptk/background_automation.html"
+    return False
+
+
+def validate_automation_artifact(label, manifest, dev_local=None):
+    if not isinstance(manifest, dict):
+        raise RuntimeError(f"{label} automation artifact has no valid manifest")
+    dedicated_runtime = uses_dedicated_automation_runtime(manifest)
+    if dev_local is not None:
+        if not isinstance(dev_local, dict) or dev_local.get("automationEnabled") is not True:
+            raise RuntimeError(f"{label} dev.local.json must set automationEnabled: true when present")
+        if dev_local.get("automationAllowChildFrameBootstrap") is True:
+            raise RuntimeError(f"{label} automation artifact must not enable child-frame bootstrap globally")
+    if not dedicated_runtime and dev_local is None:
+        raise RuntimeError(
+            f"{label} automation artifact must use the dedicated automation runtime "
+            "or include automationEnabled dev.local.json"
+        )
+
+
 def resolve_provenance_artifact_path(extension_input_dir, provenance, artifact_key):
     raw_path = (
         provenance.get("artifacts", {}).get(artifact_key, {}).get("path")
@@ -372,23 +408,18 @@ def copy_extension_artifacts(staged_package, extension_input_dir):
     chromium_dev_local_path = chromium_unpacked / DEV_LOCAL_CONFIG_FILE
     if not chromium_manifest_path.exists():
         raise RuntimeError(f"Unpacked Chromium manifest not found: {chromium_manifest_path}")
-    if not chromium_dev_local_path.exists():
-        raise RuntimeError(f"Unpacked Chromium automation config not found: {chromium_dev_local_path}")
     chromium_manifest = read_json(chromium_manifest_path)
-    chromium_dev_local = read_json(chromium_dev_local_path)
+    chromium_dev_local = read_json(chromium_dev_local_path) if chromium_dev_local_path.exists() else None
     firefox_manifest = read_zip_json(xpi_path, "manifest.json")
-    firefox_dev_local = read_zip_json(xpi_path, DEV_LOCAL_CONFIG_FILE)
+    firefox_dev_local = read_zip_json_optional(xpi_path, DEV_LOCAL_CONFIG_FILE)
     chromium_zip_manifest = read_zip_json(chrome_zip_path, "manifest.json")
-    chromium_zip_dev_local = read_zip_json(chrome_zip_path, DEV_LOCAL_CONFIG_FILE)
-    for label, payload in (
-        ("Chromium", chromium_dev_local),
-        ("Chromium ZIP", chromium_zip_dev_local),
-        ("Firefox", firefox_dev_local),
+    chromium_zip_dev_local = read_zip_json_optional(chrome_zip_path, DEV_LOCAL_CONFIG_FILE)
+    for label, manifest, dev_local in (
+        ("Chromium", chromium_manifest, chromium_dev_local),
+        ("Chromium ZIP", chromium_zip_manifest, chromium_zip_dev_local),
+        ("Firefox", firefox_manifest, firefox_dev_local),
     ):
-        if not isinstance(payload, dict) or payload.get("automationEnabled") is not True:
-            raise RuntimeError(f"{label} automation artifact must include automationEnabled dev.local.json")
-        if payload.get("automationAllowChildFrameBootstrap") is True:
-            raise RuntimeError(f"{label} automation artifact must not enable child-frame bootstrap globally")
+        validate_automation_artifact(label, manifest, dev_local)
     if chromium_manifest.get("version") != firefox_manifest.get("version"):
         raise RuntimeError(
             "Extension artifact version mismatch: "
@@ -522,27 +553,32 @@ def verify_pentestkit_wheel(wheel_path):
         f"pentestkit/extensions/{PACKAGE_FIREFOX_XPI_FILE}",
         f"pentestkit/extensions/{PACKAGE_PROVENANCE_FILE}",
         "pentestkit/extensions/chromium-unpacked/manifest.json",
-        f"pentestkit/extensions/chromium-unpacked/{DEV_LOCAL_CONFIG_FILE}",
     }
     with zipfile.ZipFile(wheel_path) as archive:
         names = set(archive.namelist())
         provenance = json.loads(archive.read(f"pentestkit/extensions/{PACKAGE_PROVENANCE_FILE}").decode("utf8"))
-        dev_local = json.loads(
-            archive.read(f"pentestkit/extensions/chromium-unpacked/{DEV_LOCAL_CONFIG_FILE}").decode("utf8")
+        unpacked_manifest = json.loads(
+            archive.read("pentestkit/extensions/chromium-unpacked/manifest.json").decode("utf8")
+        )
+        unpacked_dev_local_name = f"pentestkit/extensions/chromium-unpacked/{DEV_LOCAL_CONFIG_FILE}"
+        unpacked_dev_local = (
+            json.loads(archive.read(unpacked_dev_local_name).decode("utf8"))
+            if unpacked_dev_local_name in names
+            else None
         )
         with zipfile.ZipFile(io.BytesIO(archive.read(f"pentestkit/extensions/{PACKAGE_CHROMIUM_ZIP_FILE}"))) as extension_zip:
-            zip_dev_local = json.loads(extension_zip.read(DEV_LOCAL_CONFIG_FILE).decode("utf8"))
+            zip_manifest = json.loads(extension_zip.read("manifest.json").decode("utf8"))
+            try:
+                zip_dev_local = json.loads(extension_zip.read(DEV_LOCAL_CONFIG_FILE).decode("utf8"))
+            except KeyError:
+                zip_dev_local = None
     missing = sorted(required - names)
     if missing:
         raise RuntimeError(f"pentestkit wheel missing bundled extension files: {missing}")
     if provenance.get("automationEnabledDefault") is not True:
         raise RuntimeError("pentestkit wheel extension provenance does not mark automationEnabledDefault: true")
-    if dev_local.get("automationEnabled") is not True:
-        raise RuntimeError("pentestkit wheel Chromium extension does not enable automation by default")
-    if zip_dev_local.get("automationEnabled") is not True:
-        raise RuntimeError("pentestkit wheel Chromium ZIP does not enable automation by default")
-    if zip_dev_local.get("automationAllowChildFrameBootstrap") is True:
-        raise RuntimeError("pentestkit wheel Chromium ZIP must not enable child-frame bootstrap globally")
+    validate_automation_artifact("pentestkit wheel Chromium extension", unpacked_manifest, unpacked_dev_local)
+    validate_automation_artifact("pentestkit wheel Chromium ZIP", zip_manifest, zip_dev_local)
 
 
 def build_wheels(out_dir, build_isolation: bool = True, include_internal: bool = False, extension_input_dir=None):
