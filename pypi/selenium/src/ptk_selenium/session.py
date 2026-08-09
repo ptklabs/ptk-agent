@@ -1,7 +1,6 @@
 from contextlib import contextmanager
 from typing import Generator, Tuple
 import time
-import os
 
 from selenium.webdriver.remote.webdriver import WebDriver
 
@@ -51,8 +50,8 @@ def ptk_session(
     """
     Context manager for PTK test sessions.
 
-    NOTE: If target_url is provided, scoped IAST hooks are armed before the
-          first application navigation and the session then auto-starts.
+    NOTE: If target_url is provided, the page is loaded, the PTK Auto bridge
+          is validated, and the session then auto-starts.
           If target_url is None, you must call driver.get() and
           ptk.start_session() manually.
     """
@@ -74,14 +73,7 @@ def ptk_session(
             locked = True
 
         driver = _launch_browser(config, profile_dir)
-        extension_origin = None
-        if config.browser == "firefox":
-            extension_uuid = os.environ.get(
-                "PTK_FIREFOX_EXTENSION_UUID",
-                "7b4b556d-55d0-4db7-bf08-7c1ec1a0f5c5",
-            )
-            extension_origin = f"moz-extension://{extension_uuid}"
-        ptk = PTKDriver(driver, config.ready_timeout, extension_origin=extension_origin)
+        ptk = PTKDriver(driver, config.ready_timeout)
         hooks = FailureHooks(
             driver,
             output_dir=config.artifacts_dir,
@@ -90,16 +82,6 @@ def ptk_session(
         )
 
         if target_url:
-            arm_result = ptk.arm_iast_for_navigation(
-                target_url,
-                engines=config.engines,
-                policy_code=config.policy_code,
-                timeout=config.ready_timeout,
-            )
-            if "IAST" in [str(value).upper() for value in config.engines] and not arm_result.get("ok"):
-                raise RuntimeError(
-                    f"PTK IAST pre-navigation arm failed: {arm_result.get('error', 'unknown_error')}"
-                )
             driver.get(target_url)
             ptk.wait_ready(config.ready_timeout)
             ptk.start_session(

@@ -21,6 +21,7 @@ const {
   findingsFromPayload,
   logFindingGate,
   missingRequirementDescriptions,
+  normalizeAppBaseUrl,
   normalizeEngines,
   requireSmokeCredentials,
   toBoolean,
@@ -57,7 +58,7 @@ function readConfig() {
     framework: 'selenium',
     startedAt: new Date().toISOString(),
     sdkRoot: path.resolve(__dirname, '..'),
-    baseUrl: env('JUICE_SHOP_URL', 'http://localhost:3001').replace(/\/$/, ''),
+    baseUrl: normalizeAppBaseUrl(env('JUICE_SHOP_URL', 'http://localhost:3001')),
     browser,
     project: env('PTK_PROJECT', 'juice-shop-selenium-smoke'),
     engines: normalizeEngines(env('PTK_ENGINES', 'DAST,IAST,SAST,SCA')),
@@ -112,7 +113,9 @@ async function launchDriver(config) {
       throw new Error(`PTK Firefox XPI not found: ${config.extensionXpiPath}`)
     }
     const options = new firefox.Options()
-      .addArguments('-profile', config.profileDir, '-no-remote')
+      .setProfile(config.profileDir)
+      .addExtensions(config.extensionXpiPath)
+      .addArguments('-no-remote')
       .setPreference('browser.shell.checkDefaultBrowser', false)
       .setPreference('browser.startup.homepage_override.mstone', 'ignore')
       .setPreference('toolkit.telemetry.reportingpolicy.firstRun', false)
@@ -120,15 +123,10 @@ async function launchDriver(config) {
       .setPreference('extensions.autoDisableScopes', 0)
       .setPreference('extensions.enabledScopes', 15)
       .setPreference('extensions.webextensions.restrictedDomains', '')
-      .setPreference('extensions.webextensions.uuids', JSON.stringify({
-        'pentestkit@DenisPodgurskii': env('PTK_FIREFOX_EXTENSION_UUID', '7b4b556d-55d0-4db7-bf08-7c1ec1a0f5c5'),
-        'ptk-automation-agent@ptklabs.com': env('PTK_FIREFOX_EXTENSION_UUID', '7b4b556d-55d0-4db7-bf08-7c1ec1a0f5c5')
-      }))
       .setPreference('xpinstall.signatures.required', false)
     if (config.executablePath) options.setBinary(config.executablePath)
     if (config.headless) options.addArguments('-headless')
     const driver = await new Builder().forBrowser('firefox').setFirefoxOptions(options).build()
-    await driver.installAddon(config.extensionXpiPath, true)
     await driver.manage().setTimeouts({
       implicit: 0,
       pageLoad: Number(env('PTK_SELENIUM_PAGELOAD_TIMEOUT_MS', '45000')),
@@ -136,7 +134,7 @@ async function launchDriver(config) {
     })
     return {
       driver,
-      launchArgs: ['-profile', config.profileDir, '-no-remote', ...(config.headless ? ['-headless'] : [])]
+      launchArgs: ['prelaunch-profile-extension', '-no-remote', ...(config.headless ? ['-headless'] : [])]
     }
   }
 
@@ -505,7 +503,7 @@ async function runUserFlow(driver, config) {
 
 async function main() {
   const config = readConfig();
-  const { armPtkIastForNavigation, createSeleniumPtkBridge } = loadPtkSelenium();
+  const { createSeleniumPtkBridge } = loadPtkSelenium();
   let driver = null;
   let status = 'failed';
   let failureReason = null;
@@ -524,7 +522,7 @@ async function main() {
       headless: config.headless,
       extensionPath: config.extensionPath,
       extensionXpiPath: config.extensionXpiPath,
-      profileMode: config.browser === 'firefox' ? 'temporary-xpi' : 'user-data-dir',
+      profileMode: config.browser === 'firefox' ? 'prelaunch-profile-extension' : 'user-data-dir',
       profileDir: config.profileDir,
       launchArgs: launched.launchArgs,
       targetUrl: config.baseUrl
@@ -535,17 +533,6 @@ async function main() {
       engines: config.engines,
       policyCode: config.policyCode
     };
-    const armResult = await armPtkIastForNavigation(driver, {
-      browser: config.browser,
-      targetUrl: `${config.baseUrl}/`,
-      scanOptions: startOptions,
-      extensionPath: config.extensionPath,
-      timeoutMs: config.readyTimeoutMs
-    });
-    if (config.engines.includes('IAST') && !armResult.ok) {
-      throw new Error(`PTK IAST pre-navigation arm failed: ${JSON.stringify(armResult)}`);
-    }
-    console.log('PTK IAST pre-navigation arm:', armResult);
     await driver.get(`${config.baseUrl}/`);
     const ptk = createSeleniumPtkBridge(driver);
     const bridgeInfo = await ptk.waitReady({

@@ -1,12 +1,15 @@
 'use strict';
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { spawnSync } = require('child_process');
 const { createRequire } = require('module');
-const { resolvePtkCrxArtifact } = require('../../../extensions/index.cjs');
+const extensions = require('../../../extensions/index.cjs');
+const { resolvePtkCrxArtifact } = extensions;
 const {
   accountScopedOptions,
+  createZipFromDirectory,
   envValue,
   listEnv,
   readCachedUpload,
@@ -18,6 +21,7 @@ const {
 } = require('../../_shared/src/index.cjs');
 
 const BROWSERSTACK_UPLOAD_MEDIA_URL = 'https://api-cloud.browserstack.com/automate/upload-media';
+const BROWSERSTACK_EXTENSION_PARENT = 'ptk-automation';
 
 function loadProjectModule(name, installHint) {
   try {
@@ -166,6 +170,103 @@ function uploadBrowserStackExtension(artifact, credentials, options = {}) {
   return parseBrowserStackUploadResponse(result.stdout);
 }
 
+function browserStackZipEntries(zipPath) {
+  const result = spawnSync('unzip', ['-Z1', zipPath], {
+    encoding: 'utf8',
+    maxBuffer: 20 * 1024 * 1024
+  });
+  if (result.error) {
+    throw new Error(`Unable to inspect BrowserStack extension ZIP: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    throw new Error(
+      `Unable to inspect BrowserStack extension ZIP: ${result.stderr || result.stdout || `exit ${result.status}`}`
+    );
+  }
+  return String(result.stdout || '')
+    .split(/\r?\n/)
+    .map((entry) => entry.trim().replace(/\\/g, '/'))
+    .filter(Boolean);
+}
+
+function validateBrowserStackUploadZip(zipPath, parentDirectory = BROWSERSTACK_EXTENSION_PARENT) {
+  const prefix = `${parentDirectory}/`;
+  const entries = browserStackZipEntries(zipPath);
+  if (!entries.length) throw new Error('BrowserStack extension ZIP is empty.');
+  const invalid = entries.filter((entry) => entry !== prefix && !entry.startsWith(prefix));
+  if (invalid.length) {
+    throw new Error(
+      `BrowserStack extension ZIP must contain exactly one parent directory (${parentDirectory}); ` +
+      `found root entry ${invalid[0]}`
+    );
+  }
+  if (!entries.includes(`${prefix}manifest.json`)) {
+    throw new Error(`BrowserStack extension ZIP is missing ${prefix}manifest.json`);
+  }
+  return {
+    parentDirectory,
+    entries: entries.length
+  };
+}
+
+function extractBrowserStackSourceZip(sourceZip, destination) {
+  const result = spawnSync('unzip', ['-q', sourceZip, '-d', destination], {
+    encoding: 'utf8',
+    maxBuffer: 20 * 1024 * 1024
+  });
+  if (result.error) {
+    throw new Error(`Unable to unpack PTK for BrowserStack: ${result.error.message}`);
+  }
+  if (result.status !== 0) {
+    throw new Error(
+      `Unable to unpack PTK for BrowserStack: ${result.stderr || result.stdout || `exit ${result.status}`}`
+    );
+  }
+}
+
+function prepareBrowserStackUploadArtifact(options = {}) {
+  const source = resolveAutomationZipArtifact(options);
+  const version = String(source.version || 'unknown').replace(/[^A-Za-z0-9_.-]/g, '_');
+  const generatedRoot = path.join(
+    extensions.automationCacheRoot({ cacheRoot: options.cacheRoot }),
+    'generated',
+    'browserstack'
+  );
+  const zipPath = path.join(
+    generatedRoot,
+    `ptk-browserstack-${version}-${source.sha256.slice(0, 16)}.zip`
+  );
+
+  if (!fs.existsSync(zipPath)) {
+    fs.mkdirSync(generatedRoot, { recursive: true });
+    const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ptk-browserstack-extension-'));
+    const tempZip = `${tempRoot}.zip`;
+    try {
+      const extensionRoot = path.join(tempRoot, BROWSERSTACK_EXTENSION_PARENT);
+      fs.mkdirSync(extensionRoot, { recursive: true });
+      extractBrowserStackSourceZip(source.path, extensionRoot);
+      createZipFromDirectory(tempRoot, tempZip, { compressionLevel: 9 });
+      validateBrowserStackUploadZip(tempZip);
+      fs.renameSync(tempZip, zipPath);
+    } finally {
+      fs.rmSync(tempRoot, { recursive: true, force: true });
+      fs.rmSync(tempZip, { force: true });
+    }
+  }
+
+  const layout = validateBrowserStackUploadZip(zipPath);
+  return {
+    ...source,
+    path: zipPath,
+    sha256: extensions.sha256File(zipPath),
+    size: fs.statSync(zipPath).size,
+    source: 'browserstack-parent-folder',
+    sourceArtifactSha256: source.sha256,
+    parentDirectory: layout.parentDirectory,
+    entries: layout.entries
+  };
+}
+
 function resolveBrowserStackUploadMedia(options = {}) {
   const env = options.env || process.env;
   const extension = extensionConfigFromOptions(options);
@@ -177,7 +278,7 @@ function resolveBrowserStackUploadMedia(options = {}) {
   );
   if (!shouldUpload) return { source: 'none', values: [] };
 
-  const artifact = resolveAutomationZipArtifact(options);
+  const artifact = prepareBrowserStackUploadArtifact(options);
   if (artifact.type !== 'zip' && artifact.format !== 'zip') {
     throw new Error('BrowserStack upload-media requires a ZIP extension artifact.');
   }
@@ -663,7 +764,9 @@ module.exports = {
   createBrowserStackSeleniumCapabilities,
   credentialsFromOptions,
   inspectBrowserStackExtensionRuntime,
+  prepareBrowserStackUploadArtifact,
   resolveBrowserStackUploadMedia,
   uploadBrowserStackExtension,
+  validateBrowserStackUploadZip,
   setBrowserStackSessionStatus
 };

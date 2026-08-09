@@ -20,11 +20,11 @@ Use `window.PTK_AGENT` as the primary workflow API. `window.PTK_AUTOMATION` is t
 
 Full navigation replaces page JavaScript state. Wait for the bridge again after a navigation before issuing lifecycle, status, findings, or export calls.
 
-## IAST Before Navigation
+## IAST Bootstrap
 
-IAST document-start hooks must be armed before the first application document loads. Framework helpers do this automatically when `bootstrapUrl` is provided. A custom journey using `deferStart` should call `armPtkIastForNavigation(targetUrl)` before its first `goto()` or `driver.get()`.
+PTK Auto declares provisional IAST hooks at `document_start` for eligible web documents. The Agent does not navigate to an extension control page and does not require a fixed extension UUID. After navigating to the authorised target, it waits for the normal page bridge and starts a session bound to that tab and origin.
 
-The arm operation is restricted to the exact approved origin and does not authorise external navigation.
+Provisional hook installation does not authorise a scan or accept results on its own. Session scope and external-navigation checks remain enforced by the normal automation lifecycle.
 
 ## Browser Support
 

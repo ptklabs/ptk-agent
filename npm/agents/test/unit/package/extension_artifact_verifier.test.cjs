@@ -77,8 +77,10 @@ function sha256(value) {
   return crypto.createHash('sha256').update(value).digest('hex');
 }
 
-function createFixture() {
-  const version = '9.9.8';
+function createFixture(options = {}) {
+  const version = options.version || '9.9.8';
+  const chromiumVersion = options.chromiumVersion || version;
+  const firefoxVersion = options.firefoxVersion || version;
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ptk-release-artifacts-'));
   const icon = 'ptk/browser/assets/images/ptk_auto_icon_128.png';
   const popup = 'ptk/automation/popup.html';
@@ -87,7 +89,7 @@ function createFixture() {
     name: EXPECTED_NAME,
     short_name: EXPECTED_SHORT_NAME,
     description: EXPECTED_DESCRIPTION,
-    version,
+    version: chromiumVersion,
     background: { service_worker: 'app_automation.js' },
     icons: { 128: icon },
     action: {
@@ -101,7 +103,7 @@ function createFixture() {
     name: EXPECTED_NAME,
     short_name: EXPECTED_SHORT_NAME,
     description: EXPECTED_DESCRIPTION,
-    version,
+    version: firefoxVersion,
     background: { page: 'ptk/background_automation.html' },
     icons: { 128: icon },
     browser_action: {
@@ -120,6 +122,10 @@ function createFixture() {
     }
   };
   const chromiumManifestBytes = Buffer.from(JSON.stringify(chromiumManifest));
+  const chromiumStoreManifest = options.chromiumStoreUpdateUrl
+    ? { ...chromiumManifest, update_url: options.chromiumStoreUpdateUrl }
+    : chromiumManifest;
+  const chromiumStoreManifestBytes = Buffer.from(JSON.stringify(chromiumStoreManifest));
   const firefoxManifestBytes = Buffer.from(JSON.stringify(firefoxManifest));
   const chromiumZip = createZip({
     'manifest.json': chromiumManifestBytes,
@@ -136,15 +142,28 @@ function createFixture() {
     [icon]: 'icon',
     [popup]: '<script src="popup.js"></script>',
     'ptk/automation/popup.css': 'body {}',
+    'ptk/automation/popup.js': 'globalThis.PTK_POPUP = true;',
+    'META-INF/cose.manifest': 'signed',
+    'META-INF/cose.sig': 'signed',
+    'META-INF/manifest.mf': 'signed',
+    'META-INF/mozilla.sf': 'signed',
+    'META-INF/mozilla.rsa': 'signed'
+  });
+  const chromiumStoreZip = createZip({
+    'manifest.json': chromiumStoreManifestBytes,
+    'app_automation.js': 'globalThis.PTK_AGENT = {};',
+    [icon]: 'icon',
+    [popup]: '<script src="popup.js"></script>',
+    'ptk/automation/popup.css': 'body {}',
     'ptk/automation/popup.js': 'globalThis.PTK_POPUP = true;'
   });
   const crxHeader = Buffer.alloc(12);
   crxHeader.write('Cr24', 0, 'ascii');
   crxHeader.writeUInt32LE(3, 4);
-  const crx = Buffer.concat([crxHeader, chromiumZip]);
+  const crx = Buffer.concat([crxHeader, chromiumStoreZip]);
   const files = {
-    chromeZip: { name: `chrome_${version}_automation.zip`, bytes: chromiumZip },
-    firefoxZip: { name: `firefox_${version}_automation.zip`, bytes: firefoxZip },
+    chromeZip: { name: `chrome_${chromiumVersion}_automation.zip`, bytes: chromiumZip },
+    firefoxZip: { name: `firefox_${firefoxVersion}_automation.zip`, bytes: firefoxZip },
     crx: { name: 'ptk-latest-automation.crx', bytes: crx },
     xpi: { name: 'ptk-latest-automation.xpi', bytes: firefoxZip }
   };
@@ -155,10 +174,10 @@ function createFixture() {
     distribution: 'automation-agent',
     buildMode: 'automation-artifact',
     automationEnabledDefault: true,
-    extensionVersion: version,
+    extensionVersion: chromiumVersion,
     manifests: {
-      chromium: { version, manifestVersion: 3, sha256: sha256(chromiumManifestBytes) },
-      firefox: { version, manifestVersion: 2, sha256: sha256(firefoxManifestBytes) }
+      chromium: { version: chromiumVersion, manifestVersion: 3, sha256: sha256(chromiumStoreManifestBytes) },
+      firefox: { version: firefoxVersion, manifestVersion: 2, sha256: sha256(firefoxManifestBytes) }
     },
     artifacts: Object.fromEntries(Object.entries(files).map(([key, file]) => [
       key,
@@ -167,7 +186,7 @@ function createFixture() {
   };
   const provenancePath = path.join(root, PROVENANCE_FILE);
   fs.writeFileSync(provenancePath, `${JSON.stringify(provenance, null, 2)}\n`);
-  return { root, version, provenancePath };
+  return { root, version, chromiumVersion, firefoxVersion, provenancePath };
 }
 
 test('release artifacts require pinned provenance, matching hashes, versions, and automation identities', () => {
@@ -181,6 +200,24 @@ test('release artifacts require pinned provenance, matching hashes, versions, an
   assert.equal(result.manifests.chromium.shortName, EXPECTED_SHORT_NAME);
   assert.equal(result.manifests.firefox.geckoId, EXPECTED_FIREFOX_ID);
   assert.deepEqual(Object.keys(result.artifacts), ['chromeZip', 'firefoxZip', 'crx', 'xpi']);
+});
+
+test('release artifacts permit separately pinned Chromium and Firefox store versions', () => {
+  const fixture = createFixture({
+    chromiumVersion: '9.9.8.1',
+    firefoxVersion: '9.9.8',
+    chromiumStoreUpdateUrl: 'https://clients2.google.com/service/update2/crx'
+  });
+  const result = verifyExtensionArtifacts({
+    inputDir: fixture.root,
+    version: fixture.version,
+    chromiumVersion: fixture.chromiumVersion,
+    firefoxVersion: fixture.firefoxVersion
+  });
+  assert.equal(result.chromiumVersion, '9.9.8.1');
+  assert.equal(result.firefoxVersion, '9.9.8');
+  assert.equal(result.manifests.chromium.version, '9.9.8.1');
+  assert.equal(result.manifests.firefox.version, '9.9.8');
 });
 
 test('release artifact verification rejects tampering and a stale provenance pin', () => {
@@ -206,5 +243,5 @@ test('release artifact verification rejects a different automation extension ide
   assert.throws(() => verifyExtensionArtifacts({
     inputDir: fixture.root,
     version: fixture.version
-  }), /extensionVersion must be 9\.9\.8/);
+  }), /extensionVersion must be the Chromium version 9\.9\.8/);
 });

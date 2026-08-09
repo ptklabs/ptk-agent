@@ -30,6 +30,13 @@ const PACKAGE_FIREFOX_MANIFEST_FILE = 'manifests/manifest.automation.firefox.jso
 const PACKAGE_CHROMIUM_MANIFEST_COMPAT_FILE = 'manifests/chromium-mv3.json';
 const PACKAGE_FIREFOX_MANIFEST_COMPAT_FILE = 'manifests/firefox-mv2.json';
 const DEV_LOCAL_CONFIG_FILE = 'dev.local.json';
+const MOZILLA_SIGNATURE_ENTRIES = [
+  'META-INF/cose.manifest',
+  'META-INF/cose.sig',
+  'META-INF/manifest.mf',
+  'META-INF/mozilla.sf',
+  'META-INF/mozilla.rsa'
+];
 const NPM_PUBLIC_REPOSITORY_URL = 'https://github.com/ptklabs/ptk-agent';
 const NPM_PUBLIC_DOCS_BASE_URL = `${NPM_PUBLIC_REPOSITORY_URL}/blob/main/docs/npm`;
 const FORBIDDEN_LIFECYCLE_SCRIPTS = new Set([
@@ -102,7 +109,6 @@ const PUBLIC_DOC_EXAMPLE_ALLOWLIST = new Set([
   'browser/src/index.cjs',
   'browser/src/index.mjs',
   'browser/src/index.d.ts',
-  'browser/src/preNavigation.cjs',
   'browser/src/ptkBridge.cjs',
   'browser/src/results.cjs',
   'browser/src/redact.cjs',
@@ -235,6 +241,14 @@ function semverCore(version) {
   return match.slice(1).map((part) => Number.parseInt(part, 10));
 }
 
+function assertBrowserExtensionVersion(version, label = 'extension version') {
+  const normalized = String(version || '');
+  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?$/.test(normalized)) {
+    throw new Error(`${label} must contain three or four numeric version components: ${normalized || '(empty)'}`);
+  }
+  return normalized;
+}
+
 function compareSemverCore(a, b) {
   const left = semverCore(a);
   const right = semverCore(b);
@@ -252,21 +266,18 @@ function resolvePackageVersion(manifestVersion, override) {
 }
 
 function resolvePackageVersionInfo(manifestVersion, override) {
+  const extensionVersion = assertBrowserExtensionVersion(manifestVersion, 'manifest.version');
   if (override) {
-    const validManifestVersion = (() => {
-      try {
-        assertSemver(manifestVersion, 'manifest.version');
-        return true;
-      } catch (_) {
-        return false;
-      }
-    })();
+    const packageVersion = assertSemver(override, '--package-version');
+    if (semverCore(extensionVersion).join('.') !== semverCore(packageVersion).join('.')) {
+      throw new Error(`Package core version ${semverCore(packageVersion).join('.')} must match Chromium extension release family ${semverCore(extensionVersion).join('.')}`);
+    }
     return {
-      packageVersion: assertSemver(override, '--package-version'),
+      packageVersion,
       packageVersionSource: 'override',
-      versionMappingReason: validManifestVersion
-        ? 'operator override'
-        : 'extension manifest version is not valid npm semver'
+      versionMappingReason: extensionVersion.split('.').length === 4
+        ? `Chromium store version ${extensionVersion} maps to npm release family ${semverCore(extensionVersion).join('.')}`
+        : 'operator override'
     };
   }
   return {
@@ -550,7 +561,6 @@ function createWrappers(stageRoot) {
     'export const createPtkBridge = cjs.createPtkBridge;',
     'export const waitForPtk = cjs.waitForPtk;',
     'export const bootstrapPtkPage = cjs.bootstrapPtkPage;',
-    'export const armPtkIastForNavigation = cjs.armPtkIastForNavigation;',
     'export const withPtkScan = cjs.withPtkScan;',
     'export const collectPtkResults = cjs.collectPtkResults;',
     'export const applyAutomationScanDefaults = cjs.applyAutomationScanDefaults;',
@@ -582,7 +592,6 @@ function createWrappers(stageRoot) {
       'export const createPtkBridge = cjs.createPtkBridge;',
       'export const waitForPtk = cjs.waitForPtk;',
       'export const bootstrapPtkPage = cjs.bootstrapPtkPage;',
-      'export const armPtkIastForNavigation = cjs.armPtkIastForNavigation;',
       'export const withPtkScan = cjs.withPtkScan;',
       'export const collectPtkResults = cjs.collectPtkResults;',
       'export const applyAutomationScanDefaults = cjs.applyAutomationScanDefaults;',
@@ -590,7 +599,6 @@ function createWrappers(stageRoot) {
       'export const resolveArtifactMode = cjs.resolveArtifactMode;',
       'export const countFindings = cjs.countFindings;',
       folder === 'selenium' ? 'export const createSeleniumPtkBridge = cjs.createSeleniumPtkBridge;' : null,
-      folder === 'selenium' ? 'export const discoverSeleniumExtensionOrigin = cjs.discoverSeleniumExtensionOrigin;' : null,
       'export default cjs;',
       ''
     ].filter(Boolean).join('\n'), 'utf8');
@@ -615,8 +623,6 @@ function createWrappers(stageRoot) {
         '}',
         'export function createSeleniumPageLike(driver: PtkSeleniumDriverLike, options?: object): PtkPageLike;',
         'export function createSeleniumPtkBridge(driver: PtkSeleniumDriverLike, options?: object): PtkBridge;',
-        'export function discoverSeleniumExtensionOrigin(driver: PtkSeleniumDriverLike, options?: object): Promise<string | null>;',
-        'export function armPtkIastForNavigation(driver: PtkSeleniumDriverLike, options?: object): Promise<unknown>;',
         'export function waitForPtk(driver: PtkSeleniumDriverLike, options?: object): Promise<unknown>;',
         'export function collectPtkResults(driverOrBridge: PtkSeleniumDriverLike | PtkBridge, session?: unknown, options?: object): Promise<unknown>;',
         'export function withPtkScan<T>(',
@@ -653,7 +659,6 @@ function createWrappers(stageRoot) {
     'export const createPtkBridge = cjs.createPtkBridge;',
     'export const waitForPtk = cjs.waitForPtk;',
     'export const bootstrapPtkPage = cjs.bootstrapPtkPage;',
-    'export const armPtkIastForNavigation = cjs.armPtkIastForNavigation;',
     'export const withPtkScan = cjs.withPtkScan;',
     'export const collectPtkResults = cjs.collectPtkResults;',
     'export const applyAutomationScanDefaults = cjs.applyAutomationScanDefaults;',
@@ -1359,7 +1364,7 @@ function resolveProvenanceArtifactPath(inputDir, provenance, artifactKey) {
 function findLatestAutomationChromeZip(inputDir) {
   const matches = fs.readdirSync(inputDir)
     .map((name) => {
-      const match = name.match(/^chrome_(\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)_automation\.zip$/);
+      const match = name.match(/^chrome_(\d+\.\d+\.\d+(?:\.\d+)?)_automation\.zip$/);
       return match ? { name, version: match[1] } : null;
     })
     .filter(Boolean)
@@ -1370,7 +1375,7 @@ function findLatestAutomationChromeZip(inputDir) {
 function findLatestAutomationFirefoxZip(inputDir) {
   const matches = fs.readdirSync(inputDir)
     .map((name) => {
-      const match = name.match(/^firefox_(\d+\.\d+\.\d+(?:[-+][A-Za-z0-9.-]+)?)_automation\.zip$/);
+      const match = name.match(/^firefox_(\d+\.\d+\.\d+(?:\.\d+)?)_automation\.zip$/);
       return match ? { name, version: match[1] } : null;
     })
     .filter(Boolean)
@@ -1430,13 +1435,21 @@ function validateAutomationCrx(crxPath, expectedManifest) {
   }
 }
 
-function validateAutomationXpi(xpiPath, expectedManifest) {
+function validateAutomationXpi(xpiPath, expectedManifest, options = {}) {
   const manifest = readZipManifest(xpiPath);
   if (JSON.stringify(manifest) !== JSON.stringify(expectedManifest)) {
     throw new Error('Firefox automation XPI manifest does not match the canonical Firefox ZIP');
   }
   if (readZipFile(xpiPath, DEV_LOCAL_CONFIG_FILE)) {
     throw new Error(`Firefox automation XPI must not include ${DEV_LOCAL_CONFIG_FILE}`);
+  }
+  if (options.requireStoreSignature) {
+    const missing = MOZILLA_SIGNATURE_ENTRIES.filter((entry) => !readZipFile(xpiPath, entry));
+    if (missing.length) {
+      throw new Error(
+        `Publishable Firefox automation XPI is not Mozilla-signed; missing ${missing.join(', ')}`
+      );
+    }
   }
 }
 
@@ -1525,13 +1538,19 @@ function validatePackagedAutomationExtension(stageRoot, options = {}) {
     if (JSON.stringify(firefoxZipManifest) !== JSON.stringify(firefoxManifest)) {
       throw new Error(`Canonical Firefox ZIP manifest.json must match ${PACKAGE_FIREFOX_MANIFEST_FILE}`);
     }
-    validateAutomationXpi(xpiPath, firefoxManifest);
+    validateAutomationXpi(xpiPath, firefoxManifest, {
+      requireStoreSignature: options.requireSignedArtifacts === true
+    });
   }
 }
 
 function validateExtensionManifests(chromiumManifest, firefoxManifest) {
-  if (firefoxManifest.version !== chromiumManifest.version) {
-    throw new Error(`XPI manifest.version ${firefoxManifest.version || '(empty)'} does not match CRX manifest.version ${chromiumManifest.version || '(empty)'}`);
+  const chromiumVersion = assertBrowserExtensionVersion(chromiumManifest.version, 'CRX manifest.version');
+  const firefoxVersion = assertBrowserExtensionVersion(firefoxManifest.version, 'XPI manifest.version');
+  const chromiumCore = semverCore(chromiumVersion).join('.');
+  const firefoxCore = semverCore(firefoxVersion).join('.');
+  if (firefoxCore !== chromiumCore) {
+    throw new Error(`XPI release family ${firefoxCore} does not match CRX release family ${chromiumCore}`);
   }
   for (const [label, manifest] of [['CRX', chromiumManifest], ['XPI', firefoxManifest]]) {
     if (![2, 3].includes(Number(manifest.manifest_version))) {
@@ -1600,7 +1619,8 @@ function preparePackage(rawOptions = {}) {
     'utf8'
   );
   validatePackagedAutomationExtension(stageRoot, {
-    artifactSource: options.artifactSource
+    artifactSource: options.artifactSource,
+    requireSignedArtifacts: options.publishable
   });
 
   const manifest = readZipManifest(path.join(stageRoot, 'extensions', PACKAGE_ZIP_FILE));
@@ -1712,6 +1732,7 @@ module.exports = {
   PACKAGE_XPI_FILE,
   PTKLABS_AUTOMATION_ARTIFACT_SOURCE,
   PTKLABS_AUTOMATION_SERVICE_WORKER,
+  assertBrowserExtensionVersion,
   assertSemver,
   compareSemverCore,
   containsForbiddenPath,
@@ -1730,6 +1751,7 @@ module.exports = {
   resolveAutomationFirefoxZip,
   resolvePackageVersionInfo,
   resolvePackageVersion,
+  validateAutomationXpi,
   scanTextForSecrets,
   scanMarkdownForInternalGuidance,
   shouldSkipPublicDocOrExample,

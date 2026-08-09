@@ -401,6 +401,61 @@ function ensureUnpackedPtkExtension(options = {}) {
   return { ...artifact, format: 'unpacked', type: 'directory', path: destination, source: 'extracted' };
 }
 
+function ensureUnpackedPtkFirefoxExtension(options = {}) {
+  const explicit = options.firefoxExtensionPath || process.env.PTK_EXTENSION_FIREFOX_PATH;
+  if (explicit) {
+    const resolved = path.resolve(explicit);
+    const { manifest } = validateAutomationExtensionDir(resolved);
+    if (Number(manifest.manifest_version) !== 2) {
+      throw new Error(`PTK Firefox extension directory must use manifest_version 2: ${resolved}`);
+    }
+    return {
+      browser: 'firefox',
+      format: 'unpacked',
+      type: 'directory',
+      path: resolved,
+      version: manifest.version || null,
+      packageVersion: null,
+      sha256: '',
+      size: 0,
+      manifestVersion: 2,
+      automationEnabled: true,
+      automationEnabledDefault: true,
+      provenance: null,
+      source: 'explicit'
+    };
+  }
+
+  const artifact = resolvePtkFirefoxZipArtifact(options);
+  const destination = path.join(
+    automationCacheRoot(options),
+    'extensions',
+    `ptk-firefox-${sanitizePathPart(artifact.version)}-${artifact.sha256.slice(0, 16)}`
+  );
+  const markerPath = path.join(destination, '.ptk-artifact.json');
+  if (fs.existsSync(markerPath)) {
+    try {
+      const marker = readJson(markerPath);
+      if (marker.artifactSha256 === artifact.sha256) {
+        validateAutomationExtensionDir(destination);
+        return { ...artifact, format: 'unpacked', type: 'directory', path: destination, source: 'cache' };
+      }
+    } catch (_) {
+      // Re-extract below.
+    }
+  }
+  fs.rmSync(destination, { recursive: true, force: true });
+  fs.mkdirSync(destination, { recursive: true });
+  extractZipToDir(artifact.path, destination);
+  validateAutomationExtensionDir(destination);
+  writeJson(markerPath, {
+    artifactSha256: artifact.sha256,
+    artifactPath: artifact.path,
+    extractedAt: new Date().toISOString()
+  });
+  return { ...artifact, format: 'unpacked', type: 'directory', path: destination, source: 'extracted' };
+}
+
 function resolvePtkCrxKeyPath(options = {}) {
   const explicit = options.keyPath || process.env.PTK_CRX_KEY;
   if (explicit) return path.resolve(explicit);
@@ -609,6 +664,7 @@ module.exports = {
   automationCacheRoot,
   ensurePtkCrx,
   ensurePtkXpi,
+  ensureUnpackedPtkFirefoxExtension,
   ensureUnpackedPtkExtension,
   getPtkExtensionMetadata,
   resolvePtkCrxKeyPath,

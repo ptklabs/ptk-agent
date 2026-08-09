@@ -33,7 +33,7 @@ function createInstalledPackage(root, options = {}) {
   };
   const artifacts = {};
   const destinationNames = {
-    chromeZip: 'chrome_9.9.8_automation.zip',
+    chromeZip: 'chrome_9.9.8.1_automation.zip',
     firefoxZip: 'firefox_9.9.8_automation.zip',
     crx: 'ptk-latest-automation.crx',
     xpi: 'ptk-latest-automation.xpi'
@@ -47,12 +47,20 @@ function createInstalledPackage(root, options = {}) {
     schemaVersion: 'ptk-extension-artifact-provenance-v1',
     buildMode: 'automation-artifact',
     automationEnabledDefault: true,
-    extensionVersion: '9.9.8',
+    extensionVersion: '9.9.8.1',
+    manifests: {
+      chromium: { version: '9.9.8.1' },
+      firefox: { version: '9.9.8' }
+    },
     artifacts
   };
   fs.writeFileSync(path.join(extensionRoot, 'extension-provenance.json'), JSON.stringify({
     automationEnabledDefault: true,
-    extensionVersion: '9.9.8',
+    extensionVersion: '9.9.8.1',
+    manifests: {
+      chromium: { version: '9.9.8.1' },
+      firefox: { version: '9.9.8' }
+    },
     automationArtifactProvenance
   }));
   return packageRoot;
@@ -64,8 +72,10 @@ test('reconstructs verified four-artifact build input from an installed release'
   const output = path.join(repository, '.release', 'input');
   const result = prepareActionSmokeInput(packageRoot, output, { repositoryRoot: repository });
   assert.equal(result.packageVersion, '9.9.8');
+  assert.equal(result.chromiumExtensionVersion, '9.9.8.1');
+  assert.equal(result.firefoxExtensionVersion, '9.9.8');
   assert.deepEqual(result.artifacts.sort(), [
-    'chrome_9.9.8_automation.zip',
+    'chrome_9.9.8.1_automation.zip',
     'firefox_9.9.8_automation.zip',
     'ptk-latest-automation.crx',
     'ptk-latest-automation.xpi'
@@ -115,4 +125,3 @@ test('asserts all four engines, PTK lifecycle, and parseable SARIF', t => {
   assert.equal(result.sarifRuns, 0);
   assert.deepEqual(result.requestedEngines.sort(), ['DAST', 'IAST', 'SAST', 'SCA'].sort());
 });
-

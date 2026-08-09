@@ -5,10 +5,22 @@ const fs = require('node:fs');
 const https = require('node:https');
 const os = require('node:os');
 const path = require('node:path');
+const { spawnSync } = require('node:child_process');
 const test = require('node:test');
 
 const PROVIDERS_ROOT = path.resolve(__dirname, '../../../../providers');
 const loadProvider = name => require(path.join(PROVIDERS_ROOT, name, 'index.cjs'));
+
+function zipDirectory(sourceDirectory, outputPath) {
+  const result = spawnSync('zip', ['-q', '-r', outputPath, '.'], {
+    cwd: sourceDirectory,
+    encoding: 'utf8'
+  });
+  if (result.error || result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || result.error?.message || `zip exit ${result.status}`);
+  }
+  return outputPath;
+}
 
 const REQUIRED_EXPORTS = {
   testmu: [
@@ -242,6 +254,50 @@ test('BrowserStack builds an extension-enabled CDP contract and rejects missing 
   assert.equal(result.capabilities['browserstack.username'], 'provider-user');
   assert.equal(result.capabilities['browserstack.accessKey'], 'provider-access-key');
   assert.deepEqual(result.capabilities['browserstack.uploadMedia'], ['media://ptk-extension']);
+  assert.equal(result.capabilities['browserstack.extensions'], undefined);
+  assert.equal(result.capabilities['goog:chromeOptions'], undefined);
+  assert.doesNotMatch(decodeURIComponent(result.wsEndpoint), /--load-extension|--disable-extensions-except/);
+});
+
+test('BrowserStack upload artifact has one parent directory and a nested manifest', () => {
+  const provider = loadProvider('browserstack');
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'ptk-browserstack-layout-'));
+  const sourceDirectory = path.join(root, 'source');
+  const sourceZip = path.join(root, 'ptk-flat.zip');
+  const cacheRoot = path.join(root, 'cache');
+  fs.mkdirSync(sourceDirectory, { recursive: true });
+  fs.writeFileSync(path.join(sourceDirectory, 'manifest.json'), JSON.stringify({
+    manifest_version: 3,
+    name: 'OWASP Penetration Testing Kit Automation',
+    short_name: 'PTK Auto',
+    version: '9.9.8.1',
+    background: { service_worker: 'app_automation.js' }
+  }));
+  fs.writeFileSync(path.join(sourceDirectory, 'app_automation.js'), 'globalThis.PTK_AGENT = {};');
+  zipDirectory(sourceDirectory, sourceZip);
+
+  try {
+    const artifact = provider.prepareBrowserStackUploadArtifact({
+      env: {},
+      extensionZip: sourceZip,
+      cacheRoot
+    });
+    const layout = provider.validateBrowserStackUploadZip(artifact.path);
+    const entries = spawnSync('unzip', ['-Z1', artifact.path], { encoding: 'utf8' })
+      .stdout.split(/\r?\n/)
+      .filter(Boolean);
+    assert.equal(artifact.source, 'browserstack-parent-folder');
+    assert.equal(artifact.parentDirectory, 'ptk-automation');
+    assert.equal(layout.parentDirectory, 'ptk-automation');
+    assert.ok(entries.includes('ptk-automation/manifest.json'));
+    assert.ok(entries.every((entry) => entry.startsWith('ptk-automation/')));
+    assert.equal(
+      provider.prepareBrowserStackUploadArtifact({ env: {}, extensionZip: sourceZip, cacheRoot }).sha256,
+      artifact.sha256
+    );
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('Browserbase explicit extension IDs bypass upload and preserve validation state', async () => {

@@ -82,7 +82,18 @@ function prepareActionSmokeInput(packageRootValue, outputDirectoryValue, options
   if (packagedProvenance.automationEnabledDefault !== true || !sourceProvenance || sourceProvenance.automationEnabledDefault !== true) {
     throw new Error('installed pentestkit package is not backed by an automation extension release');
   }
-  if (sourceProvenance.extensionVersion !== packagedProvenance.extensionVersion) {
+  const sourceChromiumVersion = sourceProvenance?.manifests?.chromium?.version;
+  const sourceFirefoxVersion = sourceProvenance?.manifests?.firefox?.version;
+  const packagedChromiumVersion = packagedProvenance?.manifests?.chromium?.version;
+  const packagedFirefoxVersion = packagedProvenance?.manifests?.firefox?.version;
+  if (
+    !sourceChromiumVersion
+    || !sourceFirefoxVersion
+    || sourceProvenance.extensionVersion !== sourceChromiumVersion
+    || packagedProvenance.extensionVersion !== sourceChromiumVersion
+    || packagedChromiumVersion !== sourceChromiumVersion
+    || packagedFirefoxVersion !== sourceFirefoxVersion
+  ) {
     throw new Error('packaged and source extension provenance versions do not match');
   }
 
@@ -107,6 +118,8 @@ function prepareActionSmokeInput(packageRootValue, outputDirectoryValue, options
     packageName: manifest.name,
     packageVersion: manifest.version,
     extensionVersion: sourceProvenance.extensionVersion,
+    chromiumExtensionVersion: sourceChromiumVersion,
+    firefoxExtensionVersion: sourceFirefoxVersion,
     outputDirectory,
     artifacts: ARTIFACTS.map(([key]) => sourceProvenance.artifacts[key].path)
   };

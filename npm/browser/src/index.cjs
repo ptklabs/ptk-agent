@@ -18,9 +18,6 @@ const {
   resolveArtifactMode,
   writePtkResults
 } = require('./results.cjs');
-const {
-  armPtkIastForNavigation
-} = require('./preNavigation.cjs');
 
 function resolveBootstrap(scanOptions = {}) {
   const bootstrapUrl = scanOptions.bootstrapUrl
@@ -233,18 +230,10 @@ async function withPtkScan(page, scanOptions = {}, runJourney) {
     error: null,
     stopError: null,
     bootstrap: null,
-    preNavigationArm: null,
     resultsDir: scanOptions.resultsDir || null
   };
   let journeyError = null;
   let startPromise = null;
-  const preNavigationArmOperation = typeof scanOptions.preNavigationArmOperation === 'function'
-    ? scanOptions.preNavigationArmOperation
-    : (targetUrl, options = {}) => armPtkIastForNavigation(page, {
-      ...options,
-      targetUrl,
-      scanOptions: options.scanOptions || scanOptions
-    });
   const artifactMode = resolveArtifactMode({
     artifactMode: scanOptions.artifactMode,
     artifacts: scanOptions.artifacts
@@ -286,24 +275,6 @@ async function withPtkScan(page, scanOptions = {}, runJourney) {
   try {
     result.lifecycleStatus = 'journey_started';
     if (!deferred) {
-      const bootstrap = resolveBootstrap(scanOptions);
-      if (bootstrap && scanOptions.preNavigationArm !== false) {
-        result.preNavigationArm = await preNavigationArmOperation(bootstrap.url, {
-          ...(scanOptions.preNavigationArm && typeof scanOptions.preNavigationArm === 'object'
-            ? scanOptions.preNavigationArm
-            : {}),
-          scanOptions,
-          timeoutMs: scanOptions.preNavigationArmTimeoutMs || bootstrap.options.timeout
-        });
-        if (result.preNavigationArm.applicable && result.preNavigationArm.ok === false) {
-          const error = new PtkBridgeError(
-            `PTK IAST pre-navigation arm failed: ${result.preNavigationArm.error || 'unknown_error'}`,
-            'PTK_IAST_PRE_NAVIGATION_ARM_FAILED',
-            result.preNavigationArm
-          );
-          throw error;
-        }
-      }
       result.bootstrap = await bootstrapPtkPage(page, scanOptions);
       await startPtkScan();
     }
@@ -311,8 +282,7 @@ async function withPtkScan(page, scanOptions = {}, runJourney) {
       page,
       ptk: bridge,
       session: result.session,
-      startPtkScan,
-      armPtkIastForNavigation: preNavigationArmOperation
+      startPtkScan
     });
     if (deferred && !result.session) {
       throw makeScanNotStartedError();
@@ -401,7 +371,6 @@ module.exports = {
   countFindings,
   createPtkBridge,
   applyAutomationScanDefaults,
-  armPtkIastForNavigation,
   bootstrapPtkPage,
   normalizeEngines,
   resolveArtifactMode,

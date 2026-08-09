@@ -76,7 +76,6 @@ else
   EXTENSION_PATH="$DEFAULT_EXTENSION_PATH"
 fi
 FIREFOX_XPI="${PTK_FIREFOX_XPI:-$DEFAULT_FIREFOX_XPI}"
-FIREFOX_EXTENSION_UUID="${PTK_FIREFOX_EXTENSION_UUID:-7b4b556d-55d0-4db7-bf08-7c1ec1a0f5c5}"
 if [[ "$BROWSER" != "firefox" && ! -d "$EXTENSION_PATH" ]]; then
   echo "missing unpacked PTK extension directory: $EXTENSION_PATH" >&2
   exit 1
@@ -131,14 +130,12 @@ user_pref("extensions.autoDisableScopes", 0);
 user_pref("extensions.enabledScopes", 15);
 user_pref("extensions.installDistroAddons", true);
 user_pref("extensions.webextensions.restrictedDomains", "");
-user_pref("extensions.webextensions.uuids", "{\\"pentestkit@DenisPodgurskii\\":\\"$FIREFOX_EXTENSION_UUID\\",\\"ptk-automation-agent@ptklabs.com\\":\\"$FIREFOX_EXTENSION_UUID\\"}");
 user_pref("xpinstall.signatures.required", false);
 EOF
   {
     echo "[ptk-profile] browser=firefox"
     echo "[ptk-profile] profile=$PROFILE_DIR"
     echo "[ptk-profile] xpi=$FIREFOX_XPI"
-    echo "[ptk-profile] extension_uuid=$FIREFOX_EXTENSION_UUID"
   } >"$BOOTSTRAP_LOG"
 else
   if [[ "${PTK_PREBOOTSTRAP_PROFILE:-0}" =~ ^(1|true|yes|on)$ ]]; then
@@ -185,7 +182,6 @@ if [[ "$BROWSER" == "firefox" ]]; then
   PYTHONPATH="$CORE_ROOT/src:$SELENIUM_ROOT/src${PYTHONPATH:+:$PYTHONPATH}" \
   PTK_BROWSER="firefox" \
   PTK_HEADLESS="$HEADLESS" \
-  PTK_FIREFOX_EXTENSION_UUID="$FIREFOX_EXTENSION_UUID" \
   PTK_INSTALL_MODE="${PTK_INSTALL_MODE:-temporary}" \
   PTK_EXTENSION_XPI_PATH="$FIREFOX_XPI" \
   PTK_PROFILE_DIR="$PROFILE_DIR" \
@@ -200,7 +196,6 @@ PYTHONPATH="$CORE_ROOT/src:$PYTHON_ROOT/src${PYTHONPATH:+:$PYTHONPATH}" \
 PTK_BROWSER="$BROWSER" \
 PTK_HEADLESS="$HEADLESS" \
 PTK_EXTENSION_PATH="$EXTENSION_PATH" \
-PTK_FIREFOX_EXTENSION_UUID="$FIREFOX_EXTENSION_UUID" \
 PTK_PROFILE_DIR="$PROFILE_DIR" \
 PTK_ARTIFACTS_DIR="$ARTIFACTS_DIR" \
 PTK_PROJECT="$PROJECT_NAME" \

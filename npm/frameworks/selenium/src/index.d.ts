@@ -16,26 +16,22 @@ export interface PtkSeleniumDriverLike {
 
 export function createSeleniumPageLike(driver: PtkSeleniumDriverLike, options?: object): import("../../../browser/src").PtkPageLike;
 export function createSeleniumPtkBridge(driver: PtkSeleniumDriverLike, options?: object): import("../../../browser/src").PtkBridge;
-export function discoverSeleniumExtensionOrigin(driver: PtkSeleniumDriverLike, options?: object): Promise<string | null>;
-export function armPtkIastForNavigation(driver: PtkSeleniumDriverLike, options?: object): Promise<unknown>;
 export function waitForPtk(driver: PtkSeleniumDriverLike, options?: object): Promise<unknown>;
 export function collectPtkResults(driverOrBridge: PtkSeleniumDriverLike | import("../../../browser/src").PtkBridge, session?: unknown, options?: object): Promise<unknown>;
 export function withPtkScan<T>(
   driver: PtkSeleniumDriverLike,
   options: import("../../../browser/src").PtkScanOptions & { throwOnError: false },
-  runJourney: (ctx: { driver: PtkSeleniumDriverLike; ptk: import("../../../browser/src").PtkBridge; session: unknown; startPtkScan: import("../../../browser/src").StartPtkScan; armPtkIastForNavigation: typeof armPtkIastForNavigation }) => Promise<T>
+  runJourney: (ctx: { driver: PtkSeleniumDriverLike; ptk: import("../../../browser/src").PtkBridge; session: unknown; startPtkScan: import("../../../browser/src").StartPtkScan }) => Promise<T>
 ): Promise<import("../../../browser/src").PtkScanResult<T>>;
 export function withPtkScan<T>(
   driver: PtkSeleniumDriverLike,
   options: import("../../../browser/src").PtkScanOptions,
-  runJourney: (ctx: { driver: PtkSeleniumDriverLike; ptk: import("../../../browser/src").PtkBridge; session: unknown; startPtkScan: import("../../../browser/src").StartPtkScan; armPtkIastForNavigation: typeof armPtkIastForNavigation }) => Promise<T>
+  runJourney: (ctx: { driver: PtkSeleniumDriverLike; ptk: import("../../../browser/src").PtkBridge; session: unknown; startPtkScan: import("../../../browser/src").StartPtkScan }) => Promise<T>
 ): Promise<import("../../../browser/src").PtkScanSuccess<T>>;
 
 declare const api: {
   createSeleniumPageLike: typeof createSeleniumPageLike;
   createSeleniumPtkBridge: typeof createSeleniumPtkBridge;
-  discoverSeleniumExtensionOrigin: typeof discoverSeleniumExtensionOrigin;
-  armPtkIastForNavigation: typeof armPtkIastForNavigation;
   waitForPtk: typeof waitForPtk;
   bootstrapPtkPage: typeof import("../../../browser/src").bootstrapPtkPage;
   withPtkScan: typeof withPtkScan;

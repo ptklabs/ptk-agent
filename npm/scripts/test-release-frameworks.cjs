@@ -12,7 +12,10 @@ const { verifyArtifacts } = require("./verify-framework-artifacts.cjs");
 const NPM_ROOT = path.resolve(__dirname, "..");
 const SDKS_ROOT = path.resolve(NPM_ROOT, "..");
 const PYPI_ROOT = path.resolve(SDKS_ROOT, "pypi");
-const SOURCE_PTK_ROOT = SDKS_ROOT;
+const WORKSPACE_EXTENSION_ROOT = path.resolve(SDKS_ROOT, "..", "pentestkit");
+const SOURCE_PTK_ROOT = process.env.PTK_SOURCE_EXTENSION_ROOT
+  ? path.resolve(process.env.PTK_SOURCE_EXTENSION_ROOT)
+  : (fs.existsSync(path.join(WORKSPACE_EXTENSION_ROOT, "dist")) ? WORKSPACE_EXTENSION_ROOT : SDKS_ROOT);
 const DEFAULT_STAGE_ROOT = path.resolve(NPM_ROOT, ".release", "npm", "pentestkit");
 
 function parseArgs(argv = process.argv.slice(2)) {
@@ -300,19 +303,6 @@ function enableStagedFullExtensionAutomationSetting(extensionPath) {
   fs.writeFileSync(settingsPath, updated, "utf8");
 }
 
-function exposeStagedFirefoxAutomationControl(extensionPath) {
-  const manifestPath = path.join(extensionPath, "manifest.json");
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
-  const resource = "ptk/automation/control.html";
-  if (!Array.isArray(manifest.web_accessible_resources)) {
-    manifest.web_accessible_resources = [];
-  }
-  if (!manifest.web_accessible_resources.includes(resource)) {
-    manifest.web_accessible_resources.push(resource);
-  }
-  fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-}
-
 function prepareSourceExtension(roots, rowRoot, variant) {
   if (roots.mode !== "source") return roots.extensionPath;
   const sourceCrx = variant === "full" ? roots.fullCrx : roots.automationCrx;
@@ -349,10 +339,6 @@ function prepareSourceFirefoxXpi(roots, rowRoot, variant) {
   // temporary XPI. Simulate the user's explicit Automation setting in this
   // staged test artifact, then require the trusted page activation handshake.
   enableStagedFullExtensionAutomationSetting(extensionPath);
-  // The published full Firefox build intentionally keeps this private page
-  // non-web-accessible. This automation-enabled test-only XPI needs the same
-  // inert about:blank iframe transport used by the automation build.
-  exposeStagedFirefoxAutomationControl(extensionPath);
   validateAutomationExtensionDir(extensionPath, variant);
 
   const packed = spawnSync("zip", ["-q", "-r", stagedXpi, "."], {
@@ -401,6 +387,7 @@ function runRow(row, roots, options, extensionVariant) {
 
   if (row.framework === "cypress") {
     env.PTK_CYPRESS_EXTENSION_DIR = path.join(rowRoot, "cypress-extension");
+    env.PTK_CYPRESS_FIREFOX_EXTENSION_DIR = path.join(rowRoot, "cypress-extension-firefox");
   }
 
   if (options.immediateAnalysis !== null) {
@@ -413,6 +400,11 @@ function runRow(row, roots, options, extensionVariant) {
 
   if (["playwright", "selenium", "puppeteer"].includes(row.framework)) {
     env.PTK_PROFILE_DIR = path.join(rowRoot, "profile");
+  } else if (row.browser === "firefox" && row.framework === "cypress" && roots.mode === "package") {
+    // Package mode can prepare the bundled Firefox ZIP as a run-local unpacked
+    // WebExtension. Cypress loads it before the browser starts, so no fixed
+    // Firefox UUID or preconfigured profile is required.
+    env.PTK_PROFILE_DIR = "";
   } else if (row.browser === "firefox") {
     env.PTK_PROFILE_DIR = process.env.PTK_PROFILE_DIR || path.join(rowRoot, "profile");
   } else if (row.framework === "cypress") {
@@ -518,7 +510,6 @@ module.exports = {
   runFrameworkRelease,
   extensionVariantsForMode,
   enableStagedFullExtensionAutomationSetting,
-  exposeStagedFirefoxAutomationControl,
   prepareSourceFirefoxXpi,
   validateAutomationExtensionDir,
   writeFullExtensionAutomationConfig,

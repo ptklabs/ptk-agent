@@ -5,15 +5,17 @@ Cypress plugin for running PTK security scans during E2E tests.
 For shared PTK automation concepts, browser support, extension-loading modes, and profile setup, start with the [framework integration guide](https://github.com/ptklabs/ptk-agent/blob/main/docs/npm/frameworks.md).
 
 Supported startup modes:
-- Extension mode: load the bundled PTK extension, or a custom unpacked extension from `PTK_EXTENSION_PATH`, through a Cypress-prepared run-local copy.
-- Profile mode (Firefox): use an existing profile from `PTK_PROFILE_DIR`.
+
+- Extension mode: load the bundled Chromium or Firefox PTK Auto artifact through a Cypress-prepared run-local copy.
+- Custom extension mode: use `PTK_EXTENSION_PATH` for Chromium or `PTK_EXTENSION_FIREFOX_PATH` for Firefox.
+- Profile mode (optional, Firefox only): use an existing profile from `PTK_PROFILE_DIR`.
 
 ## Prerequisites
 
 - Node.js 18+
 - Cypress 12+
-- Bundled PTK browser extension from the `pentestkit` package, or a custom unpacked extension via `PTK_EXTENSION_PATH`
-- Or a Firefox profile with PTK pre-installed and **Automation Mode** already enabled (profile mode)
+- Bundled PTK browser extensions from the `pentestkit` package, or a custom unpacked extension override
+- Optionally, a Firefox profile with PTK pre-installed and **Automation Mode** already enabled
 - A supported browser (see [Browser Support](#browser-support))
 
 ## Installation
@@ -53,6 +55,7 @@ module.exports = defineConfig({
   env: {
     // Optional automation artifact override. Registry installs use the bundled extension by default.
     // PTK_EXTENSION_PATH: "/absolute/path/to/custom-ptk-auto",
+    // PTK_EXTENSION_FIREFOX_PATH: "/absolute/path/to/custom-firefox-ptk-auto",
     // Profile mode (Firefox only; takes precedence if set)
     // PTK_PROFILE_DIR: "/path/to/firefox/profile",
   },
@@ -129,7 +132,8 @@ Configuration is read from `cypress.env.json`, `defineConfig({ env })`, or envir
 | Key | Description | Default |
 |-----|-------------|---------|
 | `PTK_EXTENSION_PATH` | Optional path to an unpacked PTK extension source directory (extension mode override) | bundled package extension |
-| `PTK_PROFILE_DIR` | Existing Firefox profile with PTK installed and automation enabled | — |
+| `PTK_EXTENSION_FIREFOX_PATH` | Optional path to an unpacked Firefox PTK extension source directory | bundled Firefox package extension |
+| `PTK_PROFILE_DIR` | Optional existing Firefox profile with PTK installed and automation enabled | — |
 | `PTK_CYPRESS_ALLOWED_ORIGINS` | Additional comma-separated AUT origins when the suite visits more than `baseUrl` | — |
 | `PTK_CYPRESS_EXTENSION_DIR` | Optional destination for the generated Cypress run-local extension copy | `.ptk/cypress-extension/<run>` |
 | `PTK_PROJECT` | Project name for session | — |
@@ -150,7 +154,7 @@ PTK_START_TIMEOUT_MS=120000 npx cypress run --browser edge --headed
 
 ## Cypress AUT Origins
 
-Cypress runs the application under test inside a Cypress-owned child frame. The normal PTK extension does not expose the automation bridge into arbitrary child frames, so `setupPtkCypress()` creates a run-local extension copy and scopes the bridge to allowed AUT origins.
+Cypress runs the application under test inside a Cypress-owned child frame. PTK keeps the automation controller in the top frame; the Cypress commands reuse that same-origin top-frame controller while DAST, SAST, IAST, and SCA continue to observe the whole tab. The command layer rejects AUT origins outside the configured allowlist.
 
 For normal suites, set `e2e.baseUrl`; the plugin derives the origin automatically. For multi-origin suites, pass `allowedOrigins` or set `PTK_CYPRESS_ALLOWED_ORIGINS`:
 
@@ -169,9 +173,9 @@ The plugin manages its run-specific extension copy. Configure it through `setupP
 
 ## Security Model
 
-The SDK does not expose any command to force-enable automation from page code. Cypress extension mode enables automation through the generated run-local extension copy before the browser launches, and only for the configured AUT origins. If automation is disabled in an existing PTK profile, session commands are blocked.
+The SDK does not expose any command to force-enable automation from page code. Extension mode prepares the bundled browser-specific PTK Auto artifact before Cypress launches the browser. The controller remains top-frame-only, and Cypress refuses to issue commands for AUT origins outside the configured allowlist. If automation is disabled in an existing PTK profile, session commands are blocked.
 
-For secure and stable Cypress runs, use profile mode:
+The bundled Firefox artifact is the default. Profile mode remains available when a project needs persistent Firefox state:
 1. Create a dedicated Firefox profile.
 2. Install PTK in that profile.
 3. Enable Automation Mode once in PTK settings.
@@ -276,7 +280,7 @@ docker run -d -p 3001:3000 bkimminich/juice-shop
 # node_modules/pentestkit/frameworks/cypress/examples/support/e2e.js
 ```
 
-For Chromium-family browsers the wrapper lets `setupPtkCypress()` create the scoped run-local extension copy before launching Cypress. Firefox profile mode keeps using `PTK_PROFILE_DIR`.
+For Chromium-family browsers and Firefox, the wrapper lets `setupPtkCypress()` create a browser-specific run-local extension copy before launching Cypress. `PTK_PROFILE_DIR` remains an optional Firefox-only override.
 
 The example mirrors the Playwright and Selenium Juice Shop lifecycle: setup PTK in `before`, run the user flow in `it`, collect findings and enforce the Cypress finding gate in `after`, then stop the PTK session. It writes `session_start.json`, `findings.json`, `finding_gate.json`, `engine_gate.json`, `progress-summary.json`, `scan_stop.json`, `session_stats.json`, `framework-run.json`, and `browser-launch.json` under `PTK_ARTIFACTS_DIR` or `.ptk/artifacts/cypress-juice-shop`.
 
@@ -305,7 +309,7 @@ In experimental Chromium headless mode, the plugin normalizes headless args to `
 |---------|-------------|----------------|--------------|
 | Language | JavaScript | JavaScript | JavaScript |
 | Browser management | Cypress plugin hooks | User-created Playwright context | User-created WebDriver |
-| Profile management | Cypress-managed; Firefox profile mode supported | User-provided persistent context/profile | User-provided browser profile |
+| Profile management | Cypress-managed by default; optional Firefox profile mode | User-provided persistent context/profile | User-provided browser profile |
 | Extension loading | `launchOptions.extensions` plus Cypress-prepared extension copy | `--load-extension` or provider-preloaded extension | Prepared profile, or direct unpacked loading when the browser accepts it |
 | Bridge communication | `cy.window()` | `page.evaluate()` | `execute_async_script()` |
 | Tracing | Cypress videos/screenshots | Playwright traces | Driver/browser dependent |

@@ -62,7 +62,7 @@ Starting PTK after the first application document is available lets the helper b
 | --- | --- | --- | --- |
 | Browserbase | `BROWSERBASE_API_KEY` | None | Playwright, Puppeteer, Selenium |
 | Browserless | `BROWSERLESS_API_KEY`, `BROWSERLESS_EXTENSION_NAME` | None | Playwright, Puppeteer |
-| BrowserStack | `BROWSERSTACK_USERNAME`, `BROWSERSTACK_ACCESS_KEY` | None | Selenium |
+| BrowserStack | `BROWSERSTACK_USERNAME`, `BROWSERSTACK_ACCESS_KEY` | None | Playwright, Puppeteer, Selenium |
 | Hyperbrowser | `HYPERBROWSER_API_KEY` | `@hyperbrowser/sdk` | Playwright, Puppeteer; Selenium is limited |
 | Steel | `STEEL_API_KEY` | `steel-sdk` | Playwright, Puppeteer |
 | TestMu | `LT_USERNAME`, `LT_ACCESS_KEY` | `@testmuai/testmu-cloud` | Playwright, Puppeteer, Selenium |
@@ -111,18 +111,23 @@ See [Browserless browser extensions](https://docs.browserless.io/baas/features/b
 
 ## BrowserStack
 
-The supported PTK Agent path on BrowserStack is Selenium with Chrome:
+Set BrowserStack credentials and choose whether Playwright/Puppeteer should
+reuse or upload PTK Auto:
 
 ```bash
 export BROWSERSTACK_USERNAME=...
 export BROWSERSTACK_ACCESS_KEY=...
+export BROWSERSTACK_MEDIA_URL=media://...        # reuse an existing upload
+# or: export BROWSERSTACK_UPLOAD_EXTENSION=1     # create one upload
 
+node node_modules/pentestkit/providers/browserstack/examples/playwright-juice-shop.mjs
+node node_modules/pentestkit/providers/browserstack/examples/puppeteer-juice-shop.mjs
 node node_modules/pentestkit/providers/browserstack/examples/selenium-juice-shop.mjs
 ```
 
-The helper supplies the packaged PTK Auto CRX through Chrome capabilities and closes the remote session after export.
+For Playwright and Puppeteer, PTK Agent builds BrowserStack's required ZIP layout with one parent directory above `manifest.json` and supplies only `browserstack.uploadMedia`; it does not add `--load-extension` or `--disable-extensions-except`. A successful connection must also expose `window.PTK_AGENT` in the target page. Selenium supplies the packaged PTK Auto CRX through Chrome capabilities.
 
-Playwright and Puppeteer connector APIs remain available for advanced preloaded-session use, but they are not advertised as supported PTK Auto quick starts. A successful BrowserStack connection is not sufficient: `window.PTK_AGENT` must also be available in the target page.
+All three helpers close the remote session after export.
 
 See [BrowserStack Selenium](https://www.browserstack.com/docs/automate/selenium/getting-started/nodejs) and [BrowserStack Playwright extension testing](https://www.browserstack.com/docs/automate/playwright/chrome-extension-testing).
 

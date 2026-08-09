@@ -8,7 +8,6 @@ const {
   scopeFromConfig
 } = require('./context.cjs');
 const { waitForPtkBridge, startPtkScan, stopPtkScan } = require('./ptkBridge.cjs');
-const { armPtkIastForNavigation } = require('../../../browser/src/preNavigation.cjs');
 
 function lazyRequirePlaywright() {
   try {
@@ -44,17 +43,6 @@ function resolveRouteTimeout(config = {}, options = {}) {
   return Number.isFinite(timeout) && timeout > 0 ? timeout : 30000;
 }
 
-function scanOptionsFromAgentConfig(config = {}) {
-  const engines = Object.entries(config.engines || {})
-    .filter(([, value]) => value && value.enabled === true)
-    .map(([name]) => String(name).toUpperCase());
-  return {
-    engines,
-    policyCode: config.ptk && config.ptk.policyCode || null,
-    engineConfigs: config.ptk && config.ptk.engineConfigs || {}
-  };
-}
-
 async function launchBrowser(options = {}) {
   if (options.playwright || options.config) {
     const playwright = options.playwright || lazyRequirePlaywright();
@@ -77,21 +65,6 @@ async function openTarget(config = {}, options = {}) {
   let scanStartStatus = null;
   try {
     if (!page || typeof page.goto !== 'function') throw new Error('Browser launcher requires a Playwright-like page with goto().');
-    const preNavigationScanOptions = options.scanOptions || scanOptionsFromAgentConfig(config);
-    const preNavigationArm = await armPtkIastForNavigation(page, {
-      targetUrl,
-      scanOptions: preNavigationScanOptions,
-      extensionPath: session.extensionPath,
-      timeoutMs: Math.min(Math.max(timeout, 1000), 10000)
-    });
-    session.preNavigationArm = preNavigationArm;
-    if (
-      session.extensionPath
-      && preNavigationScanOptions.engines.includes('IAST')
-      && preNavigationArm.ok === false
-    ) {
-      throw new Error(`PTK IAST pre-navigation arm failed: ${preNavigationArm.error || 'unknown_error'}`);
-    }
     const response = await page.goto(targetUrl, { waitUntil: 'domcontentloaded', timeout });
     bridgeStatus = await waitForPtkBridge(page, { ...(config.ptk || {}), timeoutMs: Math.min(timeout, 1000) });
     if (!bridgeStatus.available && session.extensionPath && session.context) {
@@ -113,7 +86,6 @@ async function openTarget(config = {}, options = {}) {
     if (bridgeStatus && typeof bridgeStatus === 'object') {
       bridgeStatus.extensionMode = session.extensionMode || null;
       bridgeStatus.extensionAutomation = session.extensionAutomation || null;
-      bridgeStatus.preNavigationArm = session.preNavigationArm || null;
     }
     session.browserSummary = {
       ...(session.browserSummary || createBrowserSummary(config, session)),

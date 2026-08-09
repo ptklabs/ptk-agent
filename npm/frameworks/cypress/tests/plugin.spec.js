@@ -30,6 +30,7 @@ function runPluginSpec() {
 
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ptk-cypress-plugin-"));
   const tempExtDir = path.join(tempRoot, "extension");
+  const tempFirefoxExtDir = path.join(tempRoot, "extension-firefox");
   const tempProfileDir = path.join(tempRoot, "profile");
   fs.mkdirSync(tempExtDir, { recursive: true });
   fs.mkdirSync(tempProfileDir, { recursive: true });
@@ -40,6 +41,14 @@ function runPluginSpec() {
     background: { service_worker: "app.js" }
   }), "utf8");
   fs.writeFileSync(path.join(tempExtDir, "app.js"), "globalThis.PTK_AGENT = {};", "utf8");
+  fs.mkdirSync(path.join(tempFirefoxExtDir, "ptk"), { recursive: true });
+  fs.writeFileSync(path.join(tempFirefoxExtDir, "manifest.json"), JSON.stringify({
+    manifest_version: 2,
+    name: "OWASP PTK Automation",
+    version: "1.0.0",
+    background: { page: "ptk/background_automation.html" }
+  }), "utf8");
+  fs.writeFileSync(path.join(tempFirefoxExtDir, "ptk", "background_automation.html"), "<script></script>", "utf8");
 
   withEnv("PTK_CYPRESS_COMPAT_MODE", undefined, () => {
     assert.strictEqual(p.resolveCompatMode({ env: {} }), p.COMPAT_MODE_STRICT);
@@ -203,8 +212,6 @@ function runPluginSpec() {
   const devLocal = JSON.parse(fs.readFileSync(path.join(preparedDir, "dev.local.json"), "utf8"));
   assert.deepStrictEqual(devLocal, {
     automationEnabled: true,
-    automationAllowChildFrameBootstrap: true,
-    automationChildFrameBootstrapOrigins: ["https://app.example.test"],
   });
 
   const packageRoot = path.join(tempRoot, "package");
@@ -216,6 +223,10 @@ function runPluginSpec() {
 
   withEnv("PTK_EXTENSION_PATH", undefined, () => {
     assert.strictEqual(p.normalizeExtensionPath({ env: {} }, false), null);
+  });
+
+  withEnv("PTK_EXTENSION_FIREFOX_PATH", tempFirefoxExtDir, () => {
+    assert.strictEqual(p.normalizeFirefoxExtensionPath({ env: {} }, true), tempFirefoxExtDir);
   });
 
   const firefoxArgs = ["-profile", "/tmp/other", "-headless"];
@@ -265,29 +276,37 @@ function runPluginSpec() {
 
   withEnv("PTK_PROFILE_DIR", undefined, () => {
     withEnv("PTK_EXTENSION_PATH", tempExtDir, () => {
-      let beforeLaunch = null;
-      const config = {
-        baseUrl: "https://qa.example.test",
-        projectRoot: tempRoot,
-        env: {},
-      };
-      plugin.setupPtkCypress((event, cb) => {
-        if (event === "before:browser:launch") beforeLaunch = cb;
-      }, config, {
-        extensionDir: path.join(tempRoot, "plugin-prepared"),
-        allowedOrigins: ["https://api.example.test"],
+      withEnv("PTK_EXTENSION_FIREFOX_PATH", tempFirefoxExtDir, () => {
+        let beforeLaunch = null;
+        const config = {
+          baseUrl: "https://qa.example.test",
+          projectRoot: tempRoot,
+          env: {},
+        };
+        plugin.setupPtkCypress((event, cb) => {
+          if (event === "before:browser:launch") beforeLaunch = cb;
+        }, config, {
+          extensionDir: path.join(tempRoot, "plugin-prepared"),
+          allowedOrigins: ["https://api.example.test"],
+        });
+        assert.ok(beforeLaunch, "before:browser:launch handler should be registered");
+        assert.ok(config.env.PTK_EXTENSION_PATH.endsWith("plugin-prepared"));
+        assert.ok(config.env.PTK_EXTENSION_FIREFOX_PATH.endsWith("plugin-prepared-firefox"));
+        assert.strictEqual(
+          config.env.PTK_CYPRESS_ALLOWED_ORIGINS,
+          "https://qa.example.test,https://api.example.test"
+        );
+        const launch = beforeLaunch(
+          { name: "chromium", family: "chromium", majorVersion: 123, isHeadless: false },
+          { args: [], extensions: [] }
+        );
+        assert.ok(launch.extensions.includes(config.env.PTK_EXTENSION_PATH));
+        const firefoxLaunch = beforeLaunch(
+          { name: "firefox", family: "firefox", majorVersion: 123, isHeadless: true },
+          { args: [], extensions: [] }
+        );
+        assert.ok(firefoxLaunch.extensions.includes(config.env.PTK_EXTENSION_FIREFOX_PATH));
       });
-      assert.ok(beforeLaunch, "before:browser:launch handler should be registered");
-      assert.ok(config.env.PTK_EXTENSION_PATH.endsWith("plugin-prepared"));
-      assert.strictEqual(
-        config.env.PTK_CYPRESS_ALLOWED_ORIGINS,
-        "https://qa.example.test,https://api.example.test"
-      );
-      const launch = beforeLaunch(
-        { name: "chromium", family: "chromium", majorVersion: 123, isHeadless: false },
-        { args: [], extensions: [] }
-      );
-      assert.ok(launch.extensions.includes(config.env.PTK_EXTENSION_PATH));
     });
   });
 }

@@ -46,7 +46,6 @@ declare const api: {
   resolvePuppeteer: typeof resolvePuppeteer;
   resolveExtensionPath: typeof resolveExtensionPath;
   buildLaunchArgs: typeof buildLaunchArgs;
-  armPtkIastForNavigation: typeof import("../../../browser/src").armPtkIastForNavigation;
   createPtkBridge: typeof import("../../../browser/src").createPtkBridge;
   waitForPtk: typeof import("../../../browser/src").waitForPtk;
   bootstrapPtkPage: typeof import("../../../browser/src").bootstrapPtkPage;

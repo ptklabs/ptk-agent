@@ -463,18 +463,19 @@ class PTKPlaywrightDriver:
         Returns:
             dict with findings list and truncated flag
         """
-        if not self._session_id:
+        session_id = self._session_id or self._last_session_id
+        if not session_id:
             return {"findings": [], "truncated": False}
 
         result = self._execute_async(
             """
-            (limit) => {
-                return window.PTK_AUTOMATION.getFindings(limit)
+            (options) => {
+                return window.PTK_AUTOMATION.getFindings(options)
                     .then(r => ({ ok: true, ...r }))
                     .catch(e => ({ ok: false, error: e.message || String(e) }));
             }
             """,
-            min(limit, 500),
+            {"limit": min(limit, 500), "sessionId": session_id},
             timeout=timeout,
         )
 

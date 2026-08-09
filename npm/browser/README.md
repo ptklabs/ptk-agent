@@ -50,8 +50,7 @@ const { withPtkScan, waitForPtk, createPtkBridge } = require("pentestkit/browser
 | --- | --- |
 | `createPtkBridge(page, options)` | Create a low-level bridge around `window.PTK_AUTOMATION`. |
 | `waitForPtk(page, options)` | Wait for the PTK bridge to become ready. |
-| `armPtkIastForNavigation(page, options)` | Scope and install IAST document-start hooks before the first application navigation. |
-| `bootstrapPtkPage(page, options)` | Navigate to `bootstrapUrl` after any required IAST pre-navigation arm. |
+| `bootstrapPtkPage(page, options)` | Navigate to `bootstrapUrl` before starting the normal page-bridge session. |
 | `withPtkScan(page, options, runJourney)` | Start PTK, run the journey, stop PTK, and optionally write artifacts. |
 | `collectPtkResults(pageOrBridge, session, options)` | Collect findings, stats, progress, and export data. |
 | `writePtkResults(result, resultsDir)` | Write report artifacts or debug diagnostics to disk. |
@@ -61,17 +60,16 @@ const { withPtkScan, waitForPtk, createPtkBridge } = require("pentestkit/browser
 
 When `resultsDir` is set, the wrapper writes `report.json` and `findings.json` by default. Set `artifactMode: "debug"` or `PTK_ARTIFACT_MODE=debug` to write lifecycle diagnostics such as progress snapshots, stop responses, and the full wrapper result.
 
-When `bootstrapUrl` and IAST are selected, `withPtkScan()` automatically arms the exact scoped URL before the first application load. This installs document-start hooks without reloading the application.
+PTK Auto installs its provisional IAST hooks at `document_start`. When `bootstrapUrl` is provided, `withPtkScan()` navigates there, waits for the normal page bridge, and starts the scoped session without an extension control page or application reload.
 
-Use `deferStart: true` when a custom journey must own the first navigation. In that mode, arm IAST before `goto()`, then start the PTK session:
+Use `deferStart: true` when a custom journey must own the first navigation. Navigate to the authorised target, then start the PTK session through the page bridge:
 
 ```js
 await withPtkScan(page, {
   engines: ["DAST", "IAST"],
   deferStart: true
-}, async ({ page, armPtkIastForNavigation, startPtkScan }) => {
+}, async ({ page, startPtkScan }) => {
   const targetUrl = "https://target.example";
-  await armPtkIastForNavigation(targetUrl);
   await page.goto(targetUrl);
   await startPtkScan();
 });

@@ -38,6 +38,7 @@ const {
   scanMarkdownForInternalGuidance,
   scanTextForSecrets,
   shouldSkipPublicDocOrExample,
+  validateAutomationXpi,
   verifyStagedPackage
 } = require('../../../scripts/prepare-npm-package.cjs');
 const {
@@ -49,6 +50,7 @@ const {
 const {
   ensurePtkCrx,
   ensurePtkXpi,
+  ensureUnpackedPtkFirefoxExtension,
   resolvePtkCrxArtifact,
   resolvePtkExtensionArtifact,
   resolvePtkFirefoxZipArtifact,
@@ -161,13 +163,17 @@ test('package version validation accepts semver and rejects extension four-part 
   assert.deepEqual(resolvePackageVersionInfo('1.2.3.4', '1.2.3'), {
     packageVersion: '1.2.3',
     packageVersionSource: 'override',
-    versionMappingReason: 'extension manifest version is not valid npm semver'
+    versionMappingReason: 'Chromium store version 1.2.3.4 maps to npm release family 1.2.3'
   });
   assert.deepEqual(resolvePackageVersionInfo('1.2.3', null), {
     packageVersion: '1.2.3',
     packageVersionSource: 'extension-manifest',
     versionMappingReason: null
   });
+  assert.throws(
+    () => resolvePackageVersionInfo('1.2.3.4', '1.2.4'),
+    /must match Chromium extension release family 1\.2\.3/
+  );
 });
 
 test('default package input uses ptk-agent dist directory', () => {
@@ -251,6 +257,36 @@ test('XPI manifest is inspected from ZIP payload', () => {
   assert.equal(manifest.manifest_version, 3);
 });
 
+test('publishable Firefox XPI requires Mozilla store signature entries', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ptk-xpi-signature-'));
+  const manifest = {
+    manifest_version: 2,
+    name: 'OWASP Penetration Testing Kit Automation',
+    version: '9.9.8'
+  };
+  const unsignedPath = path.join(dir, 'unsigned.xpi');
+  fs.writeFileSync(unsignedPath, createZip({
+    'manifest.json': JSON.stringify(manifest)
+  }));
+  assert.throws(
+    () => validateAutomationXpi(unsignedPath, manifest, { requireStoreSignature: true }),
+    /not Mozilla-signed/
+  );
+
+  const signedPath = path.join(dir, 'signed.xpi');
+  fs.writeFileSync(signedPath, createZip({
+    'manifest.json': JSON.stringify(manifest),
+    'META-INF/cose.manifest': 'signed',
+    'META-INF/cose.sig': 'signed',
+    'META-INF/manifest.mf': 'signed',
+    'META-INF/mozilla.sf': 'signed',
+    'META-INF/mozilla.rsa': 'signed'
+  }));
+  assert.doesNotThrow(
+    () => validateAutomationXpi(signedPath, manifest, { requireStoreSignature: true })
+  );
+});
+
 test('installed package resolves all four provenance-pinned browser artifacts without rebuilding CRX or XPI', () => {
   const packageRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'ptk-four-artifacts-'));
   const extensionsDir = path.join(packageRoot, 'extensions');
@@ -304,6 +340,13 @@ test('installed package resolves all four provenance-pinned browser artifacts wi
   assert.equal(resolvePtkXpiArtifact({ packageRoot }).source, 'bundled-package');
   assert.equal(ensurePtkCrx({ packageRoot }).path, path.join(extensionsDir, 'ptk-latest.crx'));
   assert.equal(ensurePtkXpi({ packageRoot }).path, path.join(extensionsDir, 'ptk-latest.xpi'));
+  const unpackedFirefox = ensureUnpackedPtkFirefoxExtension({
+    packageRoot,
+    cacheRoot: path.join(packageRoot, '.ptk-cache')
+  });
+  assert.equal(unpackedFirefox.browser, 'firefox');
+  assert.equal(unpackedFirefox.manifestVersion, 2);
+  assert.equal(JSON.parse(fs.readFileSync(path.join(unpackedFirefox.path, 'manifest.json'), 'utf8')).version, '9.9.8');
 });
 
 test('staged package safety checks detect forbidden paths and obvious secrets', () => {
@@ -373,6 +416,32 @@ test('Selenium package smoke resolves Firefox through the packaged extension API
     wrapper,
     /DEFAULT_EXTENSION_PATH="\$PENTESTKIT_ROOT\/extensions\/ptk-latest\.xpi"/
   );
+});
+
+test('Selenium Firefox smoke installs the signed XPI before browser startup', () => {
+  const runnerPath = path.resolve(
+    __dirname,
+    '../../../frameworks/selenium/smoke/juice_shop_scan.cjs'
+  );
+  const runner = fs.readFileSync(runnerPath, 'utf8');
+  const prelaunchInstall = runner.indexOf('.addExtensions(config.extensionXpiPath)');
+  const browserBuild = runner.indexOf("new Builder().forBrowser('firefox')");
+
+  assert.ok(prelaunchInstall >= 0, 'Firefox options must include the signed XPI');
+  assert.ok(browserBuild > prelaunchInstall, 'the XPI must be configured before Firefox starts');
+  assert.doesNotMatch(runner, /driver\.installAddon\(/);
+  assert.match(runner, /profileMode: config\.browser === 'firefox' \? 'prelaunch-profile-extension'/);
+});
+
+test('public Selenium Firefox guidance uses the signed XPI without a fixed UUID', () => {
+  const readmePath = path.resolve(__dirname, '../../../frameworks/selenium/README.md');
+  const readme = fs.readFileSync(readmePath, 'utf8');
+
+  assert.match(readme, /ensurePtkXpi/);
+  assert.match(readme, /\.addExtensions\(xpiPath\)/);
+  assert.match(readme, /before `build\(\)`/);
+  assert.match(readme, /does not require or configure a fixed `moz-extension:\/\/` UUID/);
+  assert.doesNotMatch(readme, /inert extension iframe|fresh `about:blank` tab/);
 });
 
 test('framework release smoke rejects bypass flags', () => {

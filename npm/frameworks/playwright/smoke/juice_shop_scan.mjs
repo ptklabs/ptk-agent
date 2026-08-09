@@ -18,6 +18,7 @@ const {
   findingsFromPayload,
   logFindingGate,
   missingRequirementDescriptions,
+  normalizeAppBaseUrl,
   normalizeEngines,
   requireSmokeCredentials,
   toBoolean,
@@ -60,7 +61,7 @@ function readConfig() {
     framework: 'playwright',
     startedAt: new Date().toISOString(),
     sdkRoot: path.resolve(new URL('..', import.meta.url).pathname),
-    baseUrl: env('JUICE_SHOP_URL', 'http://localhost:3001').replace(/\/$/, ''),
+    baseUrl: normalizeAppBaseUrl(env('JUICE_SHOP_URL', 'http://localhost:3001')),
     browser: env('PTK_BROWSER', 'chromium'),
     project: env('PTK_PROJECT', 'juice-shop-playwright-smoke'),
     engines: normalizeEngines(env('PTK_ENGINES', 'DAST,IAST,SAST,SCA')),
@@ -336,7 +337,15 @@ async function typeRequired(page, selectors, value, label) {
       // Try the next selector.
     }
   }
-  throw new Error(`Could not locate ${label}. Tried: ${selectors.join(', ')}`);
+  const diagnostic = await page.evaluate(() => ({
+    url: window.location.href,
+    readyState: document.readyState,
+    bodyText: String(document.body?.innerText || '').slice(0, 500)
+  })).catch(() => ({ url: page.url(), readyState: 'unavailable', bodyText: '' }));
+  throw new Error(
+    `Could not locate ${label}. Tried: ${selectors.join(', ')}. `
+    + `Page: ${JSON.stringify(diagnostic)}`
+  );
 }
 
 async function dismissOverlays(page) {
@@ -566,7 +575,7 @@ async function runUserFlow(page, config) {
 
 async function main() {
   const config = readConfig();
-  const { armPtkIastForNavigation, createPtkBridge } = await loadPtkPlaywright();
+  const { createPtkBridge } = await loadPtkPlaywright();
   let context = null;
   let status = 'failed';
   let failureReason = null;
@@ -608,16 +617,6 @@ async function main() {
     if (portalPolicies.engineConfigs) startOptions.engineConfigs = portalPolicies.engineConfigs;
     writeJsonArtifact('session_start_options.json', summarizeStartOptions(startOptions));
 
-    const armResult = await armPtkIastForNavigation(page, {
-      targetUrl: `${config.baseUrl}/`,
-      scanOptions: startOptions,
-      extensionPath: config.extensionPath,
-      timeoutMs: config.readyTimeoutMs
-    });
-    if (config.engines.includes('IAST') && !armResult.ok) {
-      throw new Error(`PTK IAST pre-navigation arm failed: ${JSON.stringify(armResult)}`);
-    }
-    console.log('PTK IAST pre-navigation arm:', armResult);
     await page.goto(`${config.baseUrl}/`, { waitUntil: 'domcontentloaded' });
     const ptk = createPtkBridge(page);
     const bridgeInfo = await ptk.waitReady({ timeoutMs: config.readyTimeoutMs });

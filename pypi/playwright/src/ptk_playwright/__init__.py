@@ -25,7 +25,7 @@ Example usage:
 from .config import PTKPlaywrightConfig
 from .session import ptk_session
 from .driver import PTKPlaywrightDriver
-from .bridge import arm_iast_for_navigation, check_bridge_ready, validate_capabilities, preflight
+from .bridge import check_bridge_ready, validate_capabilities, preflight
 from .wrapper import PlaywrightPageAdapter, create_ptk_bridge, wait_for_ptk, with_ptk_scan
 from .exceptions import (
     PTKError,
@@ -51,7 +51,6 @@ __all__ = [
     "check_bridge_ready",
     "validate_capabilities",
     "preflight",
-    "arm_iast_for_navigation",
     # Profile management
     "ProfileManager",
     "ProfileLockedError",

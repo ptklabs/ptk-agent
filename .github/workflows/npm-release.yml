@@ -8,8 +8,18 @@ on:
         required: true
         type: string
       extension_version:
-        description: Browser extension version, for example 9.9.8
+        description: Three-part PTK release family, for example 9.9.8
         required: true
+        type: string
+      chromium_extension_version:
+        description: Exact Chromium store version; leave blank to use the release family
+        required: false
+        default: ''
+        type: string
+      firefox_extension_version:
+        description: Exact Firefox store version; leave blank to use the release family
+        required: false
+        default: ''
         type: string
       extension_provenance_sha256:
         description: SHA-256 of extension-provenance-automation.json from that release
@@ -45,6 +55,8 @@ jobs:
       EXTENSION_REPOSITORY: DenisPodgurskii/pentestkit
       EXTENSION_TAG: ${{ inputs.extension_tag }}
       EXTENSION_VERSION: ${{ inputs.extension_version }}
+      CHROMIUM_EXTENSION_VERSION: ${{ inputs.chromium_extension_version || inputs.extension_version }}
+      FIREFOX_EXTENSION_VERSION: ${{ inputs.firefox_extension_version || inputs.extension_version }}
       EXTENSION_PROVENANCE_SHA256: ${{ inputs.extension_provenance_sha256 }}
       PACKAGE_VERSION: ${{ inputs.package_version }}
       DIST_TAG: ${{ inputs.dist_tag }}
@@ -67,6 +79,8 @@ jobs:
           node npm/scripts/verify-release-intent.cjs \
             --extension-tag "$EXTENSION_TAG" \
             --extension-version "$EXTENSION_VERSION" \
+            --chromium-extension-version "$CHROMIUM_EXTENSION_VERSION" \
+            --firefox-extension-version "$FIREFOX_EXTENSION_VERSION" \
             --package-version "$PACKAGE_VERSION" \
             --dist-tag "$DIST_TAG" \
             --provenance-sha256 "$EXTENSION_PROVENANCE_SHA256" \
@@ -76,8 +90,8 @@ jobs:
         run: |
           mkdir -p dist
           gh release download "$EXTENSION_TAG" --repo "$EXTENSION_REPOSITORY" --dir dist --pattern "extension-provenance-automation.json"
-          gh release download "$EXTENSION_TAG" --repo "$EXTENSION_REPOSITORY" --dir dist --pattern "chrome_${EXTENSION_VERSION}_automation.zip"
-          gh release download "$EXTENSION_TAG" --repo "$EXTENSION_REPOSITORY" --dir dist --pattern "firefox_${EXTENSION_VERSION}_automation.zip"
+          gh release download "$EXTENSION_TAG" --repo "$EXTENSION_REPOSITORY" --dir dist --pattern "chrome_${CHROMIUM_EXTENSION_VERSION}_automation.zip"
+          gh release download "$EXTENSION_TAG" --repo "$EXTENSION_REPOSITORY" --dir dist --pattern "firefox_${FIREFOX_EXTENSION_VERSION}_automation.zip"
           gh release download "$EXTENSION_TAG" --repo "$EXTENSION_REPOSITORY" --dir dist --pattern "ptk-latest-automation.crx"
           gh release download "$EXTENSION_TAG" --repo "$EXTENSION_REPOSITORY" --dir dist --pattern "ptk-latest-automation.xpi"
 
@@ -86,6 +100,8 @@ jobs:
           node npm/scripts/verify-extension-artifacts.cjs \
             --input-dir dist \
             --version "$EXTENSION_VERSION" \
+            --chromium-version "$CHROMIUM_EXTENSION_VERSION" \
+            --firefox-version "$FIREFOX_EXTENSION_VERSION" \
             --provenance-sha256 "$EXTENSION_PROVENANCE_SHA256"
 
       - name: Install npm workspace dependencies

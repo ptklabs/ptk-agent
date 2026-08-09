@@ -3,6 +3,7 @@ import cjs from './index.cjs';
 export const automationCacheRoot = cjs.automationCacheRoot;
 export const ensurePtkCrx = cjs.ensurePtkCrx;
 export const ensurePtkXpi = cjs.ensurePtkXpi;
+export const ensureUnpackedPtkFirefoxExtension = cjs.ensureUnpackedPtkFirefoxExtension;
 export const ensureUnpackedPtkExtension = cjs.ensureUnpackedPtkExtension;
 export const getPtkExtensionMetadata = cjs.getPtkExtensionMetadata;
 export const resolvePtkExtensionArtifact = cjs.resolvePtkExtensionArtifact;

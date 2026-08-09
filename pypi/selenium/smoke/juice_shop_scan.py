@@ -80,6 +80,30 @@ def finding_label(finding: dict) -> str:
     return finding_text(finding)[:220]
 
 
+def finding_engine(finding: dict) -> str:
+    if not isinstance(finding, dict):
+        return ""
+    metadata = finding.get("metadata") if isinstance(finding.get("metadata"), dict) else {}
+    aggregate = (
+        finding.get("presentationAggregate")
+        if isinstance(finding.get("presentationAggregate"), dict)
+        else {}
+    )
+    for candidate in [
+        finding.get("engine"),
+        finding.get("engineId"),
+        finding.get("engine_id"),
+        metadata.get("engine"),
+        aggregate.get("engine"),
+    ]:
+        normalized = str(candidate or "").strip().upper()
+        if normalized.startswith("PTK_"):
+            normalized = normalized[4:]
+        if normalized in {"DAST", "IAST", "SAST", "SCA"}:
+            return normalized
+    return ""
+
+
 def evaluate_required_findings(findings) -> dict:
     matched = {
         "dast_sql_login": [],
@@ -94,33 +118,34 @@ def evaluate_required_findings(findings) -> dict:
         text = finding_text(finding)
         lower = text.lower()
         label = finding_label(finding)
+        engine = finding_engine(finding)
 
-        if ("sql" in lower or "sqli" in lower) and (
+        if engine == "DAST" and ("sql" in lower or "sqli" in lower) and (
             "login" in lower or "/rest/user/login" in lower or "rest/user/login" in lower
         ):
             matched["dast_sql_login"].append(label)
 
-        if "jwt" in lower and "none" in lower and "cookie" in lower:
+        if engine == "DAST" and "jwt" in lower and "none" in lower and "cookie" in lower:
             matched["dast_jwt_none_cookie"].append(label)
 
-        if "jwt" in lower and "none" in lower and (
+        if engine == "DAST" and "jwt" in lower and "none" in lower and (
             "authorization" in lower or "authz" in lower or "bearer" in lower
         ):
             matched["dast_jwt_none_authorization"].append(label)
 
-        if ("spa" in lower and "dom" in lower and "xss" in lower) or (
+        if engine == "DAST" and (("spa" in lower and "dom" in lower and "xss" in lower) or (
             "spa hash" in lower and "xss" in lower
-        ):
+        )):
             matched["dast_spa_dom_xss"].append(label)
 
-        if (
+        if engine == "IAST" and (
             "dom xss via element.innerhtml" in lower
             or ("element.innerhtml" in lower and "dom xss" in lower)
             or ("dom.innerhtml" in lower and "iast" in lower)
         ):
             matched["iast_innerhtml"].append(label)
 
-        if (
+        if engine == "SAST" and (
             "dom xss via innerhtml (angular)" in lower
             or ("angular" in lower and "innerhtml" in lower and "sast" in lower)
             or ("dom:angular_property_innerhtml" in lower)
@@ -798,15 +823,6 @@ def test_juice_shop_search():
     write_framework_run_artifact(config, base_url, started_at, "started")
 
     with ptk_session(config, target_url=None) as (driver, ptk):
-        arm_result = ptk.arm_iast_for_navigation(
-            f"{base_url}/",
-            engines=config.engines,
-            policy_code=config.policy_code,
-            timeout=config.ready_timeout,
-        )
-        if "IAST" in [str(value).upper() for value in config.engines] and not arm_result.get("ok"):
-            raise RuntimeError(f"PTK IAST pre-navigation arm failed: {arm_result}")
-        print("PTK IAST pre-navigation arm:", arm_result)
         if clean_state:
             clear_site_state(driver, base_url)
 

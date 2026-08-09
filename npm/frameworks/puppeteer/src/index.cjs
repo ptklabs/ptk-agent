@@ -354,7 +354,6 @@ module.exports = {
   collectPtkResults: browserCore.collectPtkResults,
   countFindings: browserCore.countFindings,
   applyAutomationScanDefaults: browserCore.applyAutomationScanDefaults,
-  armPtkIastForNavigation: browserCore.armPtkIastForNavigation,
   createPtkBridge: browserCore.createPtkBridge,
   launchPtkBrowser,
   normalizeEngines,

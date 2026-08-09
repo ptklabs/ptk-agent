@@ -11,6 +11,21 @@ function env(name, fallback = null) {
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
 }
 
+function normalizeAppBaseUrl(value, fallback = 'http://localhost:3001') {
+  const raw = String(value || fallback).trim();
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch (_) {
+    throw new Error(`Invalid application URL: ${raw}`);
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error(`Application URL must use http or https: ${raw}`);
+  }
+  const pathname = parsed.pathname.replace(/\/+$/, '');
+  return `${parsed.origin}${pathname}`;
+}
+
 function toBoolean(value, fallback = false) {
   if (value === undefined || value === null || value === '') return fallback;
   if (typeof value === 'boolean') return value;
@@ -161,6 +176,22 @@ function findingLabel(finding) {
   return findingText(finding).slice(0, 220);
 }
 
+function findingEngine(finding) {
+  if (!finding || typeof finding !== 'object') return '';
+  const candidates = [
+    finding.engine,
+    finding.engineId,
+    finding.engine_id,
+    finding.metadata?.engine,
+    finding.presentationAggregate?.engine
+  ];
+  for (const candidate of candidates) {
+    const normalized = String(candidate || '').trim().toUpperCase().replace(/^PTK_/, '');
+    if (['DAST', 'IAST', 'SAST', 'SCA'].includes(normalized)) return normalized;
+  }
+  return '';
+}
+
 function requiredFindingSpecsForEngines(engines = DEFAULT_ENGINES) {
   const selected = new Set(normalizeEngines(engines).map((engine) => String(engine || '').toUpperCase()));
   const specs = [
@@ -188,8 +219,9 @@ function evaluateRequiredFindings(findings = [], engines = DEFAULT_ENGINES) {
     const text = findingText(finding);
     const lower = text.toLowerCase();
     const label = findingLabel(finding);
+    const engine = findingEngine(finding);
 
-    if ((lower.includes('sql') || lower.includes('sqli')) && (
+    if (engine === 'DAST' && (lower.includes('sql') || lower.includes('sqli')) && (
       lower.includes('login') ||
       lower.includes('/rest/user/login') ||
       lower.includes('rest/user/login')
@@ -197,11 +229,11 @@ function evaluateRequiredFindings(findings = [], engines = DEFAULT_ENGINES) {
       matched.dast_sql_login.push(label);
     }
 
-    if (lower.includes('jwt') && lower.includes('none') && lower.includes('cookie')) {
+    if (engine === 'DAST' && lower.includes('jwt') && lower.includes('none') && lower.includes('cookie')) {
       matched.dast_jwt_none_cookie.push(label);
     }
 
-    if (lower.includes('jwt') && lower.includes('none') && (
+    if (engine === 'DAST' && lower.includes('jwt') && lower.includes('none') && (
       lower.includes('authorization') ||
       lower.includes('authz') ||
       lower.includes('bearer')
@@ -209,27 +241,27 @@ function evaluateRequiredFindings(findings = [], engines = DEFAULT_ENGINES) {
       matched.dast_jwt_none_authorization.push(label);
     }
 
-    if (
+    if (engine === 'DAST' && (
       (lower.includes('spa') && lower.includes('dom') && lower.includes('xss')) ||
       (lower.includes('spa hash') && lower.includes('xss'))
-    ) {
+    )) {
       matched.dast_spa_dom_xss.push(label);
     }
 
-    if (
+    if (engine === 'IAST' && (
       lower.includes('dom xss via element.innerhtml') ||
       (lower.includes('element.innerhtml') && lower.includes('dom xss')) ||
       (lower.includes('dom.innerhtml') && lower.includes('iast'))
-    ) {
+    )) {
       matched.iast_innerhtml.push(label);
     }
 
-    if (
+    if (engine === 'SAST' && (
       lower.includes('dom xss via innerhtml (angular)') ||
       (lower.includes('angular') && lower.includes('innerhtml') && lower.includes('sast')) ||
       lower.includes('dom:angular_property_innerhtml') ||
       lower.includes('dom:angular_renderer_setproperty')
-    ) {
+    )) {
       matched.sast_angular_innerhtml.push(label);
     }
   }
@@ -333,6 +365,7 @@ module.exports = {
   isoNow,
   logFindingGate,
   missingRequirementDescriptions,
+  normalizeAppBaseUrl,
   normalizeEngines,
   requireSmokeCredentials,
   sleep,

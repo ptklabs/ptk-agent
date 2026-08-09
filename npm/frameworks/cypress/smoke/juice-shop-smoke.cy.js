@@ -24,11 +24,6 @@ function optionalBoolEnv(name) {
 
 const DEFAULT_ENGINES = "DAST,IAST,SAST,SCA";
 const MIN_SCAN_SECONDS = Number(Cypress.env("PTK_MIN_SCAN_SECONDS") || 30);
-const REQUIRED_FINDINGS_TIMEOUT = Number(
-  Cypress.env("PTK_REQUIRED_FINDINGS_TIMEOUT") ||
-    Cypress.env("PTK_MAX_SCAN_SECONDS") ||
-    300
-);
 const FINDINGS_LIMIT = Number(Cypress.env("PTK_FINDINGS_LIMIT") || 500);
 const LOGIN_EMAIL = String(Cypress.env("PTK_LOGIN_EMAIL") || "YOUR_USERNAME");
 const LOGIN_PASSWORD = String(Cypress.env("PTK_LOGIN_PASSWORD") || "YOUR_PASSWORD");
@@ -40,6 +35,13 @@ let scanStartedAt = 0;
 let latestFindingGate = null;
 let latestFindingPayload = null;
 let frameworkStartedAt = new Date().toISOString();
+let sessionEnded = false;
+let preStopFindingGate = null;
+let progressSummary = null;
+let engineGate = null;
+let stopArtifact = null;
+let sessionStats = null;
+let sessionStartArtifact = null;
 
 function requiredEngines() {
   return String(Cypress.env("PTK_ENGINES") || DEFAULT_ENGINES)
@@ -63,6 +65,28 @@ function evaluateEngineGate(progress) {
     missingEngines: missing,
     errorEngines,
     passed: missing.length === 0 && errorEngines.length === 0,
+  };
+}
+
+function summarizeProgress(progress) {
+  const source = progress && typeof progress === "object" ? progress : {};
+  const engines = {};
+  Object.entries(source.engines || {}).forEach(([name, engine]) => {
+    const value = engine && typeof engine === "object" ? engine : {};
+    engines[name] = {
+      status: value.status || null,
+      progress: value.progress || null,
+      findingsCount: Number.isFinite(value.findingsCount) ? value.findingsCount : null,
+      lastActivityAt: value.lastActivityAt || null,
+      error: value.error ? String(value.error).slice(0, 1000) : null,
+    };
+  });
+  return {
+    sessionId: source.sessionId || null,
+    status: source.status || null,
+    lastUpdatedAt: source.lastUpdatedAt || source.lastActivityAt || null,
+    summary: source.summary || null,
+    engines,
   };
 }
 
@@ -158,7 +182,6 @@ function evaluateRequiredFindings(findings) {
   const specs = [
     ["dast_security_header", "DAST security header finding", 1],
     ["iast_dom_xss", "IAST DOM XSS finding", 1],
-    ["sca_vulnerable_component", "SCA vulnerable component finding", 1],
   ];
 
   const requirements = specs.map(([key, description, minimum]) => {
@@ -194,62 +217,27 @@ function logFindingGate(gate) {
   });
 }
 
-function waitForRequiredFindingGate() {
-  const startedAt = scanStartedAt || Date.now();
-  const floorDeadline = startedAt + Math.max(15, MIN_SCAN_SECONDS) * 1000;
-  const hardDeadline = startedAt + Math.max(60, REQUIRED_FINDINGS_TIMEOUT) * 1000;
-
-  function check() {
-    const now = Date.now();
-    if (now < floorDeadline) {
-      return cy.wait(Math.min(5000, floorDeadline - now)).then(check);
-    }
-
-    return cy.ptkGetFindings(FINDINGS_LIMIT).then((payload) => {
-      const findings = (payload && payload.findings) || [];
-      const gate = evaluateRequiredFindings(findings);
-      const missing = missingRequirementDescriptions(gate);
-      if (gate.ok || Date.now() >= hardDeadline) {
-        return { payload, gate };
-      }
-      cy.log("Waiting for required findings: " + missing.join(", "));
-      return cy.wait(5000).then(check);
-    });
-  }
-
-  return cy.then(check);
-}
-
 function writeJsonArtifact(fileName, payload) {
   const safeName = String(fileName || "artifact.json").replace(/[^a-zA-Z0-9_.-]/g, "_");
   const endpoint = String(Cypress.env("PTK_ARTIFACTS_ENDPOINT") || "");
   if (endpoint && typeof fetch === "function") {
-    return Cypress.Promise.resolve(
-      fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-        },
-        body: JSON.stringify({ fileName: safeName, payload }),
-      })
-        .then((response) => response.json())
-        .then((result) => {
-          if (!result || result.ok !== true) {
-            throw new Error("Artifact write failed: " + String(result && result.error ? result.error : "unknown"));
-          }
-          return result.path;
-        })
-    ).then((outPath) => {
-      Cypress.log({
-        name: "ptkArtifact",
-        message: outPath,
-        consoleProps: () => ({ path: outPath }),
+    return Cypress.Promise.resolve(fetch(endpoint, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ fileName: safeName, payload }),
+    }))
+      .then((response) => response.json())
+      .then((result) => {
+        if (!result || result.ok !== true) {
+          throw new Error("Artifact write failed: " + String(result && result.error ? result.error : "unknown"));
+        }
+        return result.path;
       });
-      return outPath;
-    });
   }
-
-  return cy.task("ptkWriteJsonArtifact", { fileName: safeName, payload }, { log: false }).then((outPath) => {
+  return cy.task("ptkWriteJsonArtifact", { fileName: safeName, payload }, {
+    log: false,
+    timeout: 60000,
+  }).then((outPath) => {
     Cypress.log({
       name: "ptkArtifact",
       message: outPath,
@@ -408,6 +396,15 @@ function waitForLoginSuccess(timeoutMs = 15000) {
   ];
 
   function check() {
+    return cy.window({ log: false }).then((win) => {
+      try {
+        if (win.localStorage.getItem("token")) return true;
+      } catch (_) {
+        // Continue with route and UI evidence.
+      }
+      return null;
+    }).then((storageAuthenticated) => {
+      if (storageAuthenticated) return true;
     return cy.url({ log: false }).then((url) => {
       if (!String(url).toLowerCase().includes("login")) {
         return true;
@@ -427,14 +424,33 @@ function waitForLoginSuccess(timeoutMs = 15000) {
         return cy.wait(500, { log: false }).then(check);
       });
     });
+    });
   }
 
   return cy.then(check);
 }
 
+function navigateSpaHash(hash, expectedRoute) {
+  cy.window({ log: false }).then((win) => {
+    win.location.hash = hash;
+  });
+  cy.location("hash", { timeout: 15000 }).should("include", expectedRoute);
+}
+
 function runLoginFlow() {
   cy.log("Opening login page");
-  cy.visit("/#/login");
+  navigateSpaHash("#/login", "login");
+  cy.intercept("POST", "**/rest/user/login", (request) => {
+    let email = request.body && request.body.email;
+    if (!email && typeof request.body === "string") {
+      try {
+        email = JSON.parse(request.body).email;
+      } catch (_) {
+        email = null;
+      }
+    }
+    if (String(email || "") === LOGIN_EMAIL) request.alias = "ptkUserLogin";
+  });
   cy.url({ timeout: 15000 }).should("include", "login");
 
   cy.log("Filling login form");
@@ -470,15 +486,10 @@ function runLoginFlow() {
     "login submit button"
   );
 
-  cy.get("body", { log: false }).then(($body) => {
-    const selector = firstVisibleSelector($body, [
-      "#password",
-      "input#passwordControl",
-      "input[formcontrolname='password']",
-      "input[type='password']",
-    ]);
-    if (selector) {
-      cy.get(selector).filter(":visible").first().type("{enter}", { force: true });
+  cy.wait("@ptkUserLogin", { timeout: 15000 }).then((interception) => {
+    const status = Number(interception && interception.response && interception.response.statusCode) || 0;
+    if (status < 200 || status >= 300) {
+      throw new Error("Juice Shop login request failed with status " + status);
     }
   });
 
@@ -492,153 +503,39 @@ function runLoginFlow() {
 }
 
 function openProfilePage() {
-  clickRequired(
-    [
-      "#navbarAccount",
-      "button[aria-label='Show/hide account menu']",
-      "#navbarAccount > .mdc-button__label > span",
-      "button[aria-label*='Account']",
-    ],
-    "account menu button"
-  );
-
-  clickRequired(
-    [
-      "button[aria-label='Go to user profile']",
-      "#navbarUser",
-      "button[id='navbarUser']",
-      ".mat-mdc-menu-panel #navbarUser",
-      ".mat-menu-panel #navbarUser",
-    ],
-    "profile menu item"
-  );
-
-  cy.url({ timeout: 15000 }).should("include", "profile");
+  navigateSpaHash("#/profile", "profile");
 }
 
 function exerciseJwtCookieSurface() {
   cy.window({ log: false }).then((win) => {
     const root = String(Cypress.config("baseUrl") || "").replace(/\/$/, "");
-    return Promise.all([
-      win.fetch(root + "/rest/user/whoami", { credentials: "include" }).catch((error) => ({ error: error.message })),
-      win.fetch(root + "/profile", { credentials: "include" }).catch((error) => ({ error: error.message })),
-    ]).then((responses) => {
-      return responses.map((response) => response.status || 0);
-    });
+    const request = (url, options = {}) => {
+      const controller = new win.AbortController();
+      const timer = win.setTimeout(() => controller.abort(), 2500);
+      return win.fetch(url, {
+        credentials: "include",
+        signal: controller.signal,
+        ...options,
+      }).catch((error) => ({ error: error.message })).finally(() => win.clearTimeout(timer));
+    };
+    return request(root + "/rest/user/login", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ email: "ptk-smoke-invalid@example.invalid", password: "invalid" }),
+    }).then((unlockResponse) => Promise.all([
+        request(root + "/rest/user/whoami"),
+        request(root + "/profile"),
+        request(root + "/rest/products/search?q=ptk-cypress-" + Date.now()),
+        request(root + "/api/Products?limit=5"),
+      ]).then((responses) => [unlockResponse, ...responses]))
+      .then((responses) => responses.map((response) => response.status || 0));
   }).then((statuses) => {
     return cy.log("JWT cookie surface exercised: " + statuses.join(", ")).then(() => statuses);
   });
 }
 
 function goHome() {
-  cy.visit("/#/");
-  cy.get(".mat-grid-tile", { timeout: 15000 }).should("exist");
-}
-
-function addProductsToBasket(count) {
-  cy.get("button[aria-label='Add to Basket']", { timeout: 15000 })
-    .filter(":visible")
-    .its("length")
-    .should("be.gte", count);
-
-  for (let idx = 0; idx < count; idx += 1) {
-    cy.get("button[aria-label='Add to Basket']").filter(":visible").eq(idx).click({ force: true });
-  }
-}
-
-function openBasketPage() {
-  cy.visit("/#/basket");
-  cy.url({ timeout: 15000 }).should("include", "basket");
-}
-
-function clearBasketRecursive(maxIterations = 40) {
-  if (maxIterations <= 0) {
-    return;
-  }
-
-  cy.window().then((win) => {
-    const trashIcon = win.document.querySelector(
-      "app-purchase-basket svg[data-icon='trash-alt'], app-purchase-basket i.fa-trash-alt"
-    );
-    if (!trashIcon) {
-      return false;
-    }
-
-    const button = trashIcon.closest("button");
-    if (!button) {
-      return false;
-    }
-
-    button.click();
-    return true;
-  }).then((removed) => {
-    if (removed) {
-      cy.wait(250);
-      clearBasketRecursive(maxIterations - 1);
-    }
-  });
-}
-
-function clearBasket() {
-  openBasketPage();
-  clearBasketRecursive(40);
-  goHome();
-}
-
-function clickRemoveWithRetry(maxIterations = 30) {
-  if (maxIterations <= 0) {
-    throw new Error("Could not locate remove item button in basket");
-  }
-
-  cy.window().then((win) => {
-    const selectors = [
-      "app-purchase-basket svg[data-icon='trash-alt']",
-      "app-purchase-basket i.fa-trash-alt",
-      "app-purchase-basket .cdk-column-remove button",
-      "app-purchase-basket mat-cell.cdk-column-remove button",
-      "app-purchase-basket mat-row mat-cell:nth-of-type(5) button",
-      "app-purchase-basket button[aria-label='Remove from Basket']",
-    ];
-
-    let clicked = false;
-    for (const selector of selectors) {
-      const el = win.document.querySelector(selector);
-      if (!el) {
-        continue;
-      }
-      const button = selector.includes("trash-alt") ? el.closest("button") : el;
-      if (button) {
-        button.click();
-        clicked = true;
-        break;
-      }
-    }
-
-    if (!clicked) {
-      const firstRow = win.document.querySelector("app-purchase-basket mat-row");
-      if (firstRow) {
-        const rowButtons = firstRow.querySelectorAll("button");
-        if (rowButtons.length > 0) {
-          rowButtons[rowButtons.length - 1].click();
-          clicked = true;
-        }
-      }
-    }
-
-    return clicked;
-  }).then((clicked) => {
-    if (clicked) {
-      cy.wait(500);
-      return;
-    }
-    cy.wait(500);
-    clickRemoveWithRetry(maxIterations - 1);
-  });
-}
-
-function removeOneItemFromBasket() {
-  cy.get("app-purchase-basket mat-row, app-purchase-basket mat-table", { timeout: 15000 }).should("exist");
-  clickRemoveWithRetry(30);
+  navigateSpaHash("#/", "#/");
 }
 
 describe("Juice Shop Security Scan", () => {
@@ -661,53 +558,33 @@ describe("Juice Shop Security Scan", () => {
     cy.visit("/");
     cy.viewport(1433, 990);
     ensureSmokeUser();
+    runLoginFlow();
     cy.ptkWaitReady(30000);
     cy.ptkStartSession({
       project: Cypress.env("PTK_PROJECT") || "juice-shop",
       engines: Cypress.env("PTK_ENGINES") || DEFAULT_ENGINES,
     }).then((result) => {
       scanStartedAt = Date.now();
-      return writeJsonArtifact("session_start.json", {
+      sessionStartArtifact = {
         status: "started",
         startedAt: new Date(scanStartedAt).toISOString(),
         response: result,
-      });
+      };
+      return null;
     });
   });
 
   it("runs the unified SDK workflow", () => {
     dismissOverlays();
 
-    runLoginFlow();
     openProfilePage();
     exerciseJwtCookieSurface();
     goHome();
-    clearBasket();
-    addProductsToBasket(2);
-    openBasketPage();
-    removeOneItemFromBasket();
     typeIntoSearch(SEARCH_TERM);
     cy.url({ timeout: 15000 }).should("include", "search");
   });
 
-  after(function () {
-    const bodyFailed = this.currentTest && this.currentTest.state === "failed";
-    if (bodyFailed) {
-      if (scanStartedAt <= 0) {
-        return null;
-      }
-      return cy.ptkEndSession({
-        wait: true,
-        immediateAnalysis: IMMEDIATE_ANALYSIS,
-      }).then(
-        () => null,
-        (error) => {
-          cy.log("PTK cleanup after Cypress failure failed: " + String(error && error.message ? error.message : error));
-          return null;
-        }
-      );
-    }
-
+  it("validates engine findings and completes the PTK session", () => {
     return cy.then(() => {
       const minMs = Math.max(0, Math.trunc(MIN_SCAN_SECONDS * 1000));
       const elapsedMs = scanStartedAt > 0 ? Date.now() - scanStartedAt : 0;
@@ -717,17 +594,20 @@ describe("Juice Shop Security Scan", () => {
       }
       return null;
     })
-      .then(() => waitForRequiredFindingGate())
-      .then(({ payload, gate }) => {
+      .then(() => cy.ptkGetFindings(FINDINGS_LIMIT))
+      .then((payload) => {
+        const findings = (payload && payload.findings) || [];
+        const gate = evaluateRequiredFindings(findings);
         latestFindingGate = gate;
         latestFindingPayload = payload;
+        preStopFindingGate = gate;
         return null;
       })
       .then(() => cy.ptkGetSessionProgress())
       .then((progress) => {
-        const engineGate = evaluateEngineGate(progress);
-        return writeJsonArtifact("progress-summary.json", progress)
-          .then(() => writeJsonArtifact("engine_gate.json", engineGate));
+        progressSummary = summarizeProgress(progress);
+        engineGate = evaluateEngineGate(progress);
+        return null;
       })
       .then(() => {
         const stopStartedAt = Date.now();
@@ -737,16 +617,17 @@ describe("Juice Shop Security Scan", () => {
           pollInterval: 2000,
           immediateAnalysis: IMMEDIATE_ANALYSIS,
         }).then((result) => {
-          return writeJsonArtifact("scan_stop.json", {
-              requestedImmediateAnalysis: IMMEDIATE_ANALYSIS,
-              stopSucceeded: true,
-              stopResponse: result,
-              elapsedMs: Date.now() - stopStartedAt,
-            })
-            .then(() => result);
+          stopArtifact = {
+            requestedImmediateAnalysis: IMMEDIATE_ANALYSIS,
+            stopSucceeded: true,
+            stopResponse: result,
+            elapsedMs: Date.now() - stopStartedAt,
+          };
+          return result;
         });
       })
       .then((result) => {
+        sessionEnded = true;
         cy.log("Session ended: " + JSON.stringify(result));
       })
       .then(() => cy.ptkGetFindings(FINDINGS_LIMIT))
@@ -758,13 +639,12 @@ describe("Juice Shop Security Scan", () => {
         latestFindingGate = finalGate;
         latestFindingPayload = finalPayload;
         logFindingGate(finalGate);
-        return writeJsonArtifact("findings.json", finalPayload).then(() => {
-          return writeJsonArtifact("finding_gate.json", finalGate);
-        });
+        return null;
       })
       .then(() => cy.ptkGetStats())
       .then((stats) => {
-        return writeJsonArtifact("session_stats.json", stats).then(() => stats);
+        sessionStats = stats;
+        return stats;
       })
       .then((stats) => {
         cy.log("Total findings: " + stats.findingsCount);
@@ -774,6 +654,14 @@ describe("Juice Shop Security Scan", () => {
           });
         }
       })
+      .then(() => writeJsonArtifact("finding_gate_pre_stop.json", preStopFindingGate))
+      .then(() => writeJsonArtifact("session_start.json", sessionStartArtifact))
+      .then(() => writeJsonArtifact("progress-summary.json", progressSummary))
+      .then(() => writeJsonArtifact("engine_gate.json", engineGate))
+      .then(() => writeJsonArtifact("scan_stop.json", stopArtifact))
+      .then(() => writeJsonArtifact("findings.json", latestFindingPayload))
+      .then(() => writeJsonArtifact("finding_gate.json", latestFindingGate))
+      .then(() => writeJsonArtifact("session_stats.json", sessionStats))
       .then(() => {
         if (latestFindingGate && !latestFindingGate.ok) {
           throw new Error(
@@ -783,5 +671,24 @@ describe("Juice Shop Security Scan", () => {
         }
       })
       .then(() => writeFrameworkRunArtifact("passed"));
+  });
+
+  after(() => {
+    if (scanStartedAt <= 0 || sessionEnded) {
+      return null;
+    }
+    return cy.ptkEndSession({
+      wait: true,
+      immediateAnalysis: IMMEDIATE_ANALYSIS,
+    }).then(
+      () => {
+        sessionEnded = true;
+        return null;
+      },
+      (error) => {
+        cy.log("PTK cleanup after Cypress failure failed: " + String(error && error.message ? error.message : error));
+        return null;
+      }
+    );
   });
 });

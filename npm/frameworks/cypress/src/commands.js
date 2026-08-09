@@ -37,6 +37,16 @@ function safeJson(value, maxLen) {
 function getBridge(win) {
   var b = win.PTK_AUTOMATION;
   if (!b) {
+    try {
+      // Cypress hosts the AUT in a same-origin child frame. Keep PTK's
+      // privileged automation controller in the top frame and reuse it from
+      // the test frame; engine instrumentation remains all-frame.
+      b = win.top && win.top.PTK_AUTOMATION;
+    } catch (_) {
+      b = null;
+    }
+  }
+  if (!b) {
     throw new Error(
       "PTK bridge not found on window. Call cy.ptkWaitReady() first and ensure the extension is loaded."
     );
@@ -237,14 +247,17 @@ function ptkWaitReady(timeout) {
 
     return cy.window({ log: false }).then(function (win) {
       assertCurrentOriginAllowed(win);
-      if (!win.PTK_AUTOMATION) {
+      var currentBridge;
+      try {
+        currentBridge = getBridge(win);
+      } catch (_) {
         return cy.wait(POLL_INTERVAL, { log: false }).then(poll);
       }
 
       return new Cypress.Promise(function (resolve) {
         Promise.resolve()
           .then(function () {
-            var b = win.PTK_AUTOMATION;
+            var b = currentBridge;
             if (typeof b.ping === "function") {
               return b.ping();
             }
@@ -476,9 +489,15 @@ function ptkGetStats() {
     return new Cypress.Promise(function (resolve, reject) {
       Promise.resolve()
         .then(function () {
-          return b.getStats();
+          return b.getStats({
+            sessionId: Cypress.env("PTK_SESSION_ID"),
+            sessionScope: "current-tab",
+          });
         })
         .then(function (result) {
+          if (result && (result.ok === false || result.error)) {
+            throw new Error(formatBridgeFailure("getStats", result));
+          }
           Cypress.log({
             name: "ptkGetStats",
             message: (result && result.findingsCount) + " findings",
@@ -501,9 +520,18 @@ function ptkGetFindings(limit) {
     return new Cypress.Promise(function (resolve, reject) {
       Promise.resolve()
         .then(function () {
-          return b.getFindings(limit);
+          return b.getFindings({
+            limit: limit,
+            sessionId: Cypress.env("PTK_SESSION_ID"),
+            sessionScope: "current-tab",
+          });
         })
-        .then(resolve)
+        .then(function (result) {
+          if (result && (result.ok === false || result.error)) {
+            throw new Error(formatBridgeFailure("getFindings", result));
+          }
+          resolve(result);
+        })
         .catch(reject);
     });
   });

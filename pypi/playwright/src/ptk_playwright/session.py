@@ -16,7 +16,6 @@ from .profiles import ProfileManager
 from .driver import PTKPlaywrightDriver
 from .hooks import PlaywrightFailureHooks
 from .launcher import launch_persistent_context
-from .bridge import arm_iast_for_navigation
 
 
 @contextmanager
@@ -54,7 +53,6 @@ def ptk_session(
 
     Note:
         If target_url is provided:
-        - Arms scoped IAST document-start hooks before the first application load
         - Navigates to target_url without requiring a reload
         - Waits for PTK bridge to be ready
         - Starts session with config settings
@@ -111,20 +109,6 @@ def ptk_session(
 
         # Auto-setup if target_url provided
         if target_url:
-            arm_result = arm_iast_for_navigation(
-                page,
-                target_url,
-                scan_options={
-                    "engines": config.engines,
-                    "policyCode": config.policy_code,
-                },
-                extension_path=config.extension_path,
-                timeout=config.ready_timeout,
-            )
-            if "IAST" in [str(value).upper() for value in config.engines] and not arm_result.get("ok"):
-                raise RuntimeError(
-                    f"PTK IAST pre-navigation arm failed: {arm_result.get('error', 'unknown_error')}"
-                )
             page.goto(target_url, wait_until="domcontentloaded")
             ptk.wait_ready(config.ready_timeout)
             ptk.start_session(

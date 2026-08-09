@@ -10,6 +10,14 @@ const { setupPtkCypress } = process.env.PTK_RELEASE_TEST_MODE === "package" && p
 const EXAMPLES_DIR = __dirname;
 const CYPRESS_ROOT = path.resolve(EXAMPLES_DIR, "..");
 
+function normalizeAppBaseUrl(value) {
+  const parsed = new URL(String(value || "http://localhost:3001"));
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new Error(`Application URL must use http or https: ${value}`);
+  }
+  return `${parsed.origin}${parsed.pathname.replace(/\/+$/, "")}`;
+}
+
 module.exports = defineConfig({
   e2e: {
     baseUrl: "http://localhost:3001",
@@ -22,6 +30,7 @@ module.exports = defineConfig({
     ],
     supportFile: path.join(EXAMPLES_DIR, "support/e2e.js"),
     setupNodeEvents(on, config) {
+      config.baseUrl = normalizeAppBaseUrl(config.baseUrl);
       function artifactsDir() {
         return (
           process.env.PTK_ARTIFACTS_DIR ||
@@ -62,6 +71,7 @@ module.exports = defineConfig({
           }
         });
         req.on("error", (error) => {
+          if (res.headersSent) return;
           res.writeHead(500, { "content-type": "application/json" });
           res.end(JSON.stringify({ ok: false, error: error.message }));
         });

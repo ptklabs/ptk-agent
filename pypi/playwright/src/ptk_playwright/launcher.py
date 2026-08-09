@@ -6,8 +6,6 @@ Supports Chromium-based browsers and Firefox.
 """
 
 from pathlib import Path
-import json
-import os
 from typing import Tuple
 
 from playwright.sync_api import sync_playwright, BrowserContext, Page, Playwright
@@ -311,19 +309,12 @@ def _build_firefox_args(config: PTKPlaywrightConfig) -> dict:
     Firefox uses preferences (about:config) instead of command-line flags.
     Returns a dict for firefox_user_prefs launch option.
     """
-    extension_uuid = os.environ.get(
-        "PTK_FIREFOX_EXTENSION_UUID",
-        "7b4b556d-55d0-4db7-bf08-7c1ec1a0f5c5",
-    )
     prefs = {
         # Allow extensions to run (don't block sideloaded addons)
         "extensions.autoDisableScopes": 0,
         "extensions.enabledScopes": 15,
         "extensions.installDistroAddons": True,
         "extensions.webextensions.restrictedDomains": "",
-        "extensions.webextensions.uuids": json.dumps({
-            "pentestkit@DenisPodgurskii": extension_uuid,
-        }),
         "xpinstall.signatures.required": False,
         # Disable first-run pages
         "browser.startup.homepage_override.mstone": "ignore",

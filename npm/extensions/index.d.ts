@@ -19,6 +19,7 @@ export interface PtkExtensionOptions {
   packageRoot?: string;
   cacheRoot?: string;
   extensionPath?: string;
+  firefoxExtensionPath?: string;
   crxPath?: string;
   firefoxZipPath?: string;
   xpiPath?: string;
@@ -29,6 +30,7 @@ export interface PtkExtensionOptions {
 export function automationCacheRoot(options?: PtkExtensionOptions): string;
 export function ensurePtkCrx(options?: PtkExtensionOptions): PtkExtensionArtifact;
 export function ensurePtkXpi(options?: PtkExtensionOptions): PtkExtensionArtifact;
+export function ensureUnpackedPtkFirefoxExtension(options?: PtkExtensionOptions): PtkExtensionArtifact;
 export function ensureUnpackedPtkExtension(options?: PtkExtensionOptions): PtkExtensionArtifact;
 export function getPtkExtensionMetadata(options?: PtkExtensionOptions): unknown;
 export function resolvePtkExtensionArtifact(options?: PtkExtensionOptions): PtkExtensionArtifact;
@@ -43,6 +45,7 @@ declare const api: {
   automationCacheRoot: typeof automationCacheRoot;
   ensurePtkCrx: typeof ensurePtkCrx;
   ensurePtkXpi: typeof ensurePtkXpi;
+  ensureUnpackedPtkFirefoxExtension: typeof ensureUnpackedPtkFirefoxExtension;
   ensureUnpackedPtkExtension: typeof ensureUnpackedPtkExtension;
   getPtkExtensionMetadata: typeof getPtkExtensionMetadata;
   resolvePtkExtensionArtifact: typeof resolvePtkExtensionArtifact;

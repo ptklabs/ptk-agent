@@ -24,7 +24,6 @@ from ptk_playwright import (
     PTKPlaywrightConfig,
     PTKSessionError,
     PTKTimeoutError,
-    arm_iast_for_navigation,
     ptk_session,
 )
 
@@ -119,6 +118,30 @@ def finding_label(finding: dict) -> str:
     return finding_text(finding)[:220]
 
 
+def finding_engine(finding: dict) -> str:
+    if not isinstance(finding, dict):
+        return ""
+    metadata = finding.get("metadata") if isinstance(finding.get("metadata"), dict) else {}
+    aggregate = (
+        finding.get("presentationAggregate")
+        if isinstance(finding.get("presentationAggregate"), dict)
+        else {}
+    )
+    for candidate in [
+        finding.get("engine"),
+        finding.get("engineId"),
+        finding.get("engine_id"),
+        metadata.get("engine"),
+        aggregate.get("engine"),
+    ]:
+        normalized = str(candidate or "").strip().upper()
+        if normalized.startswith("PTK_"):
+            normalized = normalized[4:]
+        if normalized in {"DAST", "IAST", "SAST", "SCA"}:
+            return normalized
+    return ""
+
+
 def evaluate_required_findings(findings: List[dict]) -> dict:
     matched = {
         "dast_sql_login": [],
@@ -133,33 +156,34 @@ def evaluate_required_findings(findings: List[dict]) -> dict:
         text = finding_text(finding)
         lower = text.lower()
         label = finding_label(finding)
+        engine = finding_engine(finding)
 
-        if ("sql" in lower or "sqli" in lower) and (
+        if engine == "DAST" and ("sql" in lower or "sqli" in lower) and (
             "login" in lower or "/rest/user/login" in lower or "rest/user/login" in lower
         ):
             matched["dast_sql_login"].append(label)
 
-        if "jwt" in lower and "none" in lower and "cookie" in lower:
+        if engine == "DAST" and "jwt" in lower and "none" in lower and "cookie" in lower:
             matched["dast_jwt_none_cookie"].append(label)
 
-        if "jwt" in lower and "none" in lower and (
+        if engine == "DAST" and "jwt" in lower and "none" in lower and (
             "authorization" in lower or "authz" in lower or "bearer" in lower
         ):
             matched["dast_jwt_none_authorization"].append(label)
 
-        if ("spa" in lower and "dom" in lower and "xss" in lower) or (
+        if engine == "DAST" and (("spa" in lower and "dom" in lower and "xss" in lower) or (
             "spa hash" in lower and "xss" in lower
-        ):
+        )):
             matched["dast_spa_dom_xss"].append(label)
 
-        if (
+        if engine == "IAST" and (
             "dom xss via element.innerhtml" in lower
             or ("element.innerhtml" in lower and "dom xss" in lower)
             or ("dom.innerhtml" in lower and "iast" in lower)
         ):
             matched["iast_innerhtml"].append(label)
 
-        if (
+        if engine == "SAST" and (
             "dom xss via innerhtml (angular)" in lower
             or ("angular" in lower and "innerhtml" in lower and "sast" in lower)
             or ("dom:angular_property_innerhtml" in lower)
@@ -587,6 +611,7 @@ def build_coverage_summary(export_result: dict, progress: dict = None) -> dict:
         "ok": True,
         "generatedAt": iso_now(),
         "exportOk": bool(export_result.get("ok")) if isinstance(export_result, dict) else False,
+        "exportError": export_result.get("error") if isinstance(export_result, dict) else None,
         "exportWarnings": export_result.get("warnings", []) if isinstance(export_result, dict) else [],
         "totals": {
             "requestCount": total_requests,
@@ -1335,7 +1360,7 @@ def remove_one_item_from_basket(page):
 
 
 def test_juice_shop_search():
-    base_url = os.getenv("JUICE_SHOP_URL", "http://localhost:3001")
+    base_url = os.getenv("JUICE_SHOP_URL", "http://localhost:3001").rstrip("/")
     clean_state = _truthy_env("PTK_CLEAN_STATE", default="1")
     min_scan_seconds = float(os.getenv("PTK_MIN_SCAN_SECONDS", "30"))
     idle_stable_seconds = float(os.getenv("PTK_IDLE_STABLE_SECONDS", "12"))
@@ -1354,19 +1379,6 @@ def test_juice_shop_search():
     write_framework_run_artifact(config, base_url, started_at, "started")
 
     with ptk_session(config, target_url=None) as (page, ptk):
-        arm_result = arm_iast_for_navigation(
-            page,
-            f"{base_url}/",
-            scan_options={
-                "engines": config.engines,
-                "policyCode": config.policy_code,
-            },
-            extension_path=config.extension_path,
-            timeout=config.ready_timeout,
-        )
-        if "IAST" in [str(value).upper() for value in config.engines] and not arm_result.get("ok"):
-            raise RuntimeError(f"PTK IAST pre-navigation arm failed: {arm_result}")
-        print("PTK IAST pre-navigation arm:", arm_result)
         if clean_state:
             clear_site_state(page, base_url)
 
@@ -1465,6 +1477,15 @@ def test_juice_shop_search():
                 },
             )
             write_json_artifact(config, "session_stats.json", result.get("summary", result))
+
+            final_findings_result = ptk.get_findings(limit=findings_limit, timeout=60)
+            final_findings = final_findings_result.get("findings", [])
+            if final_findings:
+                findings_result = final_findings_result
+                findings = final_findings
+                findings_artifact = write_json_artifact(config, "findings.json", findings_result)
+                finding_gate = evaluate_required_findings(findings)
+                gate_artifact = write_json_artifact(config, "finding_gate.json", finding_gate)
 
             try:
                 coverage_export = ptk.export_scan_payload(

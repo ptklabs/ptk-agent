@@ -13,11 +13,19 @@ function loadPtkPuppeteer() {
   return require('../src/index.cjs');
 }
 
-const { armPtkIastForNavigation, launchPtkBrowser, normalizeEngines } = loadPtkPuppeteer();
+const { launchPtkBrowser, normalizeEngines } = loadPtkPuppeteer();
 
 function env(name, fallback = null) {
   const value = process.env[name];
   return typeof value === 'string' && value.trim() ? value.trim() : fallback;
+}
+
+function normalizeAppBaseUrl(value) {
+  const parsed = new URL(String(value || 'http://localhost:3001'));
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error(`Application URL must use http or https: ${value}`);
+  }
+  return `${parsed.origin}${parsed.pathname.replace(/\/+$/, '')}`;
 }
 
 function toBoolean(value, fallback = false) {
@@ -244,7 +252,7 @@ function readConfig() {
   const engines = normalizeEngines(env('PTK_ENGINES', 'DAST,IAST,SAST,SCA'));
   return {
     startedAt: isoNow(),
-    baseUrl: env('JUICE_SHOP_URL', 'http://localhost:3001'),
+    baseUrl: normalizeAppBaseUrl(env('JUICE_SHOP_URL', 'http://localhost:3001')),
     browser: env('PTK_BROWSER', 'chrome-for-testing'),
     project: env('PTK_PROJECT', 'juice-shop-puppeteer-smoke'),
     engines,
@@ -302,16 +310,6 @@ async function main() {
       engines: config.engines,
       policyCode: config.policyCode
     };
-    const armResult = await armPtkIastForNavigation(page, {
-      targetUrl: `${config.baseUrl}/`,
-      scanOptions: startOptions,
-      extensionPath: config.extensionPath,
-      timeoutMs: config.readyTimeoutMs
-    });
-    if (config.engines.includes('IAST') && !armResult.ok) {
-      throw new Error(`PTK IAST pre-navigation arm failed: ${JSON.stringify(armResult)}`);
-    }
-    console.log('PTK IAST pre-navigation arm:', armResult);
     await page.goto(`${config.baseUrl}/`, { waitUntil: 'domcontentloaded' });
     const bridgeInfo = await ptk.waitReady(config.readyTimeoutMs);
     console.log('PTK bridge ready:', {

@@ -93,8 +93,8 @@ For cloud browser providers such as Browserless or Browserbase, upload or preins
 | --- | --- |
 | `project` | PTK project/session label. |
 | `engines` | Engines to enable, for example `["DAST", "IAST", "SAST"]`. |
-| `bootstrapUrl` | Recommended first application URL. IAST is armed for this exact scope before navigation. |
-| `deferStart` | Lets a custom callback own navigation; call `armPtkIastForNavigation(targetUrl)` before its first `goto()` when IAST is selected. |
+| `bootstrapUrl` | Recommended first application URL. PTK navigates there before starting the page-bridge session. |
+| `deferStart` | Lets a custom callback own navigation; call `startPtkScan()` after the first authorised `goto()`. |
 | `policyCode` | Optional DAST policy code. |
 | `resultsDir` | Directory where wrapper artifacts are written. |
 | `artifactMode` | `report` writes `report.json` and `findings.json`; `debug` writes lifecycle diagnostics. Defaults to `report`. |

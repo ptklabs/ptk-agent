@@ -19,6 +19,8 @@ test('next release intent requires a matching extension tag and prerelease packa
   }), {
     extensionTag: '9.9.8',
     extensionVersion: '9.9.8',
+    chromiumExtensionVersion: '9.9.8',
+    firefoxExtensionVersion: '9.9.8',
     packageVersion: '9.9.8-rc.1',
     distTag: 'next',
     provenanceSha256
@@ -30,6 +32,24 @@ test('next release intent requires a matching extension tag and prerelease packa
     distTag: 'next',
     provenanceSha256
   }), /requires a prerelease/);
+});
+
+test('release intent permits an explicit four-part Chromium store version in the same release family', () => {
+  const result = validateReleaseIntent({
+    extensionTag: '9.9.8',
+    extensionVersion: '9.9.8',
+    chromiumExtensionVersion: '9.9.8.1',
+    firefoxExtensionVersion: '9.9.8',
+    packageVersion: '9.9.8-rc.1',
+    distTag: 'next',
+    provenanceSha256
+  });
+  assert.equal(result.chromiumExtensionVersion, '9.9.8.1');
+  assert.equal(result.firefoxExtensionVersion, '9.9.8');
+  assert.throws(() => validateReleaseIntent({
+    ...result,
+    chromiumExtensionVersion: '9.9.9.1'
+  }), /must belong to release family 9\.9\.8/);
 });
 
 test('latest release intent requires an exact final version match', () => {

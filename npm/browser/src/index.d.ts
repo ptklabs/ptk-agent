@@ -10,12 +10,6 @@ export interface PtkScanOptions {
   project?: string;
   engines?: PtkEngine[];
   deferStart?: boolean;
-  preNavigationArm?: boolean | {
-    extensionOrigin?: string;
-    timeoutMs?: number;
-    ttlMs?: number;
-  };
-  preNavigationArmTimeoutMs?: number;
   bootstrapUrl?: string;
   bootstrapWaitUntil?: "load" | "domcontentloaded" | "networkidle" | string;
   bootstrapTimeoutMs?: number;
@@ -111,7 +105,6 @@ export interface PtkScanSuccess<T = unknown> {
   afterStop?: unknown;
   stop?: unknown;
   bootstrap?: unknown;
-  preNavigationArm?: unknown;
   resultsDir?: string | null;
   journeyResult?: T;
 }
@@ -130,7 +123,6 @@ export interface PtkScanFailure {
   afterStop?: unknown;
   stop?: unknown;
   bootstrap?: unknown;
-  preNavigationArm?: unknown;
   error?: unknown;
   stopError?: unknown;
   resultsDir?: string | null;
@@ -180,7 +172,6 @@ export class PtkScanError extends Error {
 export function createPtkBridge(page: PtkPageLike, options?: object): PtkBridge;
 export function waitForPtk(page: PtkPageLike, options?: object): Promise<unknown>;
 export function bootstrapPtkPage(page: PtkPageLike, options?: PtkScanOptions): Promise<unknown>;
-export function armPtkIastForNavigation(page: PtkPageLike, options?: object): Promise<unknown>;
 export function collectPtkResults(pageOrBridge: PtkPageLike | PtkBridge, session?: unknown, options?: object): Promise<unknown>;
 export function writePtkResults(result: unknown, resultsDir: string, options?: object): string[];
 export function resolveArtifactMode(options?: object): "report" | "debug";
@@ -189,12 +180,12 @@ export function applyAutomationScanDefaults(options?: PtkScanOptions): PtkScanOp
 export function withPtkScan<T>(
   page: PtkPageLike,
   options: PtkScanOptions & { throwOnError: false },
-  runJourney: (ctx: { page: PtkPageLike; ptk: PtkBridge; session: unknown; startPtkScan: StartPtkScan; armPtkIastForNavigation: typeof armPtkIastForNavigation }) => Promise<T>
+  runJourney: (ctx: { page: PtkPageLike; ptk: PtkBridge; session: unknown; startPtkScan: StartPtkScan }) => Promise<T>
 ): Promise<PtkScanResult<T>>;
 export function withPtkScan<T>(
   page: PtkPageLike,
   options: PtkScanOptions,
-  runJourney: (ctx: { page: PtkPageLike; ptk: PtkBridge; session: unknown; startPtkScan: StartPtkScan; armPtkIastForNavigation: typeof armPtkIastForNavigation }) => Promise<T>
+  runJourney: (ctx: { page: PtkPageLike; ptk: PtkBridge; session: unknown; startPtkScan: StartPtkScan }) => Promise<T>
 ): Promise<PtkScanSuccess<T>>;
 
 declare const api: {
@@ -204,7 +195,6 @@ declare const api: {
   createPtkBridge: typeof createPtkBridge;
   waitForPtk: typeof waitForPtk;
   bootstrapPtkPage: typeof bootstrapPtkPage;
-  armPtkIastForNavigation: typeof armPtkIastForNavigation;
   withPtkScan: typeof withPtkScan;
   collectPtkResults: typeof collectPtkResults;
   applyAutomationScanDefaults: typeof applyAutomationScanDefaults;

@@ -23,17 +23,28 @@ const EXPECTED_FIREFOX_DATA_COLLECTION = [
   'websiteContent',
   'authenticationInfo'
 ];
+const MOZILLA_SIGNATURE_ENTRIES = [
+  'META-INF/cose.manifest',
+  'META-INF/cose.sig',
+  'META-INF/manifest.mf',
+  'META-INF/mozilla.sf',
+  'META-INF/mozilla.rsa'
+];
 
 function parseArgs(argv = process.argv.slice(2)) {
   const options = {
     inputDir: null,
     version: null,
+    chromiumVersion: null,
+    firefoxVersion: null,
     provenanceSha256: null
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--input-dir') options.inputDir = path.resolve(argv[++index]);
     else if (arg === '--version') options.version = argv[++index];
+    else if (arg === '--chromium-version') options.chromiumVersion = argv[++index];
+    else if (arg === '--firefox-version') options.firefoxVersion = argv[++index];
     else if (arg === '--provenance-sha256') options.provenanceSha256 = argv[++index];
     else if (arg === '--help' || arg === '-h') options.help = true;
     else throw new Error(`Unknown option: ${arg}`);
@@ -44,9 +55,11 @@ function parseArgs(argv = process.argv.slice(2)) {
 function help() {
   return [
     'Usage:',
-    '  node scripts/verify-extension-artifacts.cjs --input-dir <dir> --version <version> [options]',
+    '  node scripts/verify-extension-artifacts.cjs --input-dir <dir> --version <release-version> [options]',
     '',
     'Options:',
+    '  --chromium-version <version>  Exact Chromium store version. Defaults to --version.',
+    '  --firefox-version <version>   Exact Firefox store version. Defaults to --version.',
     '  --provenance-sha256 <sha256>  Pin the provenance file downloaded from a release.'
   ].join('\n');
 }
@@ -67,18 +80,30 @@ function assertSha256(value, label) {
   return normalized;
 }
 
-function assertVersion(value) {
+function assertReleaseVersion(value) {
   const version = String(value || '').trim();
-  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z.-]+)?$/.test(version)) {
-    throw new Error(`--version must be valid extension semver: ${version || '(empty)'}`);
+  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/.test(version)) {
+    throw new Error(`--version must be a final three-part release version: ${version || '(empty)'}`);
   }
   return version;
 }
 
-function expectedArtifacts(version) {
+function assertBrowserVersion(value, label) {
+  const version = String(value || '').trim();
+  if (!/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?$/.test(version)) {
+    throw new Error(`${label} must contain three or four numeric version components: ${version || '(empty)'}`);
+  }
+  return version;
+}
+
+function versionCore(version) {
+  return String(version).split('.').slice(0, 3).join('.');
+}
+
+function expectedArtifacts(chromiumVersion, firefoxVersion = chromiumVersion) {
   return {
-    chromeZip: `chrome_${version}_automation.zip`,
-    firefoxZip: `firefox_${version}_automation.zip`,
+    chromeZip: `chrome_${chromiumVersion}_automation.zip`,
+    firefoxZip: `firefox_${firefoxVersion}_automation.zip`,
     crx: 'ptk-latest-automation.crx',
     xpi: 'ptk-latest-automation.xpi'
   };
@@ -175,16 +200,36 @@ function assertAutomationPopup(manifest, label, actionKey) {
   }
 }
 
-function verifyManifests(artifacts, provenance, version) {
+function normalizeChromiumStoreManifest(manifest) {
+  const normalized = { ...manifest };
+  if (normalized.update_url) {
+    if (normalized.update_url !== 'https://clients2.google.com/service/update2/crx') {
+      throw new Error(`Chromium CRX manifest has an unexpected update_url: ${normalized.update_url}`);
+    }
+    delete normalized.update_url;
+  }
+  return normalized;
+}
+
+function verifyManifests(artifacts, provenance, versions) {
+  const { chromiumVersion, firefoxVersion } = versions;
   const chromiumManifest = readZipManifest(artifacts.chromeZip.path);
   const firefoxManifest = readZipManifest(artifacts.firefoxZip.path);
   const crxManifest = readCrxManifest(artifacts.crx.path);
   const xpiManifest = readZipManifest(artifacts.xpi.path);
+  const missingMozillaSignatures = MOZILLA_SIGNATURE_ENTRIES.filter(
+    (entry) => !readZipFile(artifacts.xpi.path, entry)
+  );
+  if (missingMozillaSignatures.length) {
+    throw new Error(
+      `Firefox automation XPI is not Mozilla-signed; missing ${missingMozillaSignatures.join(', ')}`
+    );
+  }
 
-  assertIdentity(chromiumManifest, 'Chromium ZIP', version, 3);
-  assertIdentity(crxManifest, 'Chromium CRX', version, 3);
-  assertIdentity(firefoxManifest, 'Firefox ZIP', version, 2);
-  assertIdentity(xpiManifest, 'Firefox XPI', version, 2);
+  assertIdentity(chromiumManifest, 'Chromium ZIP', chromiumVersion, 3);
+  assertIdentity(crxManifest, 'Chromium CRX', chromiumVersion, 3);
+  assertIdentity(firefoxManifest, 'Firefox ZIP', firefoxVersion, 2);
+  assertIdentity(xpiManifest, 'Firefox XPI', firefoxVersion, 2);
   assertAutomationPopup(chromiumManifest, 'Chromium ZIP', 'action');
   assertAutomationPopup(crxManifest, 'Chromium CRX', 'action');
   assertAutomationPopup(firefoxManifest, 'Firefox ZIP', 'browser_action');
@@ -208,7 +253,7 @@ function verifyManifests(artifacts, provenance, version) {
   if (JSON.stringify(firefoxGecko?.data_collection_permissions) !== JSON.stringify({ required: EXPECTED_FIREFOX_DATA_COLLECTION })) {
     throw new Error('Firefox automation manifest must declare the reviewed built-in data-consent categories');
   }
-  if (JSON.stringify(crxManifest) !== JSON.stringify(chromiumManifest)) {
+  if (JSON.stringify(normalizeChromiumStoreManifest(crxManifest)) !== JSON.stringify(chromiumManifest)) {
     throw new Error('Chromium CRX manifest does not match Chromium ZIP manifest');
   }
   if (JSON.stringify(xpiManifest) !== JSON.stringify(firefoxManifest)) {
@@ -226,17 +271,19 @@ function verifyManifests(artifacts, provenance, version) {
     }
   }
 
-  for (const [key, artifact, expectedManifest] of [
-    ['chromium', artifacts.chromeZip, chromiumManifest],
-    ['firefox', artifacts.firefoxZip, firefoxManifest]
+  for (const [key, rawManifest, expectedManifest] of [
+    ['chromium', readCrxFile(artifacts.crx.path, 'manifest.json'), chromiumManifest],
+    ['firefox', readZipFile(artifacts.xpi.path, 'manifest.json'), firefoxManifest]
   ]) {
     const declared = provenance?.manifests?.[key];
     if (!declared) throw new Error(`${PROVENANCE_FILE} is missing manifests.${key}`);
-    if (declared.version !== version) throw new Error(`manifests.${key}.version must be ${version}`);
+    const expectedVersion = key === 'chromium' ? chromiumVersion : firefoxVersion;
+    if (declared.version !== expectedVersion) {
+      throw new Error(`manifests.${key}.version must be ${expectedVersion}`);
+    }
     if (Number(declared.manifestVersion) !== Number(expectedManifest.manifest_version)) {
       throw new Error(`manifests.${key}.manifestVersion does not match the archive manifest`);
     }
-    const rawManifest = readZipFile(artifact.path, 'manifest.json');
     const rawSha256 = sha256Buffer(rawManifest || Buffer.alloc(0));
     if (rawSha256 !== assertSha256(declared.sha256, `manifests.${key}.sha256`)) {
       throw new Error(`manifests.${key}.sha256 does not match the archive manifest`);
@@ -248,7 +295,14 @@ function verifyManifests(artifacts, provenance, version) {
 
 function verifyExtensionArtifacts(options = {}) {
   const inputDir = path.resolve(options.inputDir || '');
-  const version = assertVersion(options.version);
+  const version = assertReleaseVersion(options.version);
+  const chromiumVersion = assertBrowserVersion(options.chromiumVersion || version, '--chromium-version');
+  const firefoxVersion = assertBrowserVersion(options.firefoxVersion || version, '--firefox-version');
+  for (const [label, browserVersion] of [['Chromium', chromiumVersion], ['Firefox', firefoxVersion]]) {
+    if (versionCore(browserVersion) !== version) {
+      throw new Error(`${label} extension version ${browserVersion} must belong to release family ${version}`);
+    }
+  }
   if (!fs.existsSync(inputDir) || !fs.statSync(inputDir).isDirectory()) {
     throw new Error(`--input-dir does not exist or is not a directory: ${inputDir}`);
   }
@@ -271,19 +325,21 @@ function verifyExtensionArtifacts(options = {}) {
   if (provenance.buildMode !== 'automation-artifact' || provenance.automationEnabledDefault !== true) {
     throw new Error(`${PROVENANCE_FILE} must describe an automation-artifact build enabled by default`);
   }
-  if (provenance.extensionVersion !== version) {
-    throw new Error(`${PROVENANCE_FILE} extensionVersion must be ${version}`);
+  if (provenance.extensionVersion !== chromiumVersion) {
+    throw new Error(`${PROVENANCE_FILE} extensionVersion must be the Chromium version ${chromiumVersion}`);
   }
 
-  const expected = expectedArtifacts(version);
+  const expected = expectedArtifacts(chromiumVersion, firefoxVersion);
   const artifacts = Object.fromEntries(Object.entries(expected).map(([key, name]) => [
     key,
     verifyArtifactFile(inputDir, provenance, key, name)
   ]));
-  const manifests = verifyManifests(artifacts, provenance, version);
+  const manifests = verifyManifests(artifacts, provenance, { chromiumVersion, firefoxVersion });
   return {
     ok: true,
     version,
+    chromiumVersion,
+    firefoxVersion,
     provenancePath,
     provenanceSha256,
     artifacts,
@@ -291,11 +347,13 @@ function verifyExtensionArtifacts(options = {}) {
       chromium: {
         name: manifests.chromium.name,
         shortName: manifests.chromium.short_name,
+        version: manifests.chromium.version,
         manifestVersion: manifests.chromium.manifest_version
       },
       firefox: {
         name: manifests.firefox.name,
         shortName: manifests.firefox.short_name,
+        version: manifests.firefox.version,
         manifestVersion: manifests.firefox.manifest_version,
         geckoId: manifests.firefox.browser_specific_settings?.gecko?.id
           || manifests.firefox.applications?.gecko?.id
@@ -328,9 +386,13 @@ module.exports = {
   EXPECTED_NAME,
   EXPECTED_SHORT_NAME,
   PROVENANCE_FILE,
+  assertBrowserVersion,
   assertIdentity,
+  assertReleaseVersion,
   assertSha256,
   expectedArtifacts,
+  normalizeChromiumStoreManifest,
   parseArgs,
+  versionCore,
   verifyExtensionArtifacts
 };

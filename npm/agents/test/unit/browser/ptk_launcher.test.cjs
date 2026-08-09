@@ -173,126 +173,46 @@ test('PTK automation bootstrap verifies automation through the extension service
   assert.equal(result.extensionUrl, 'chrome-extension://abc/manifest.json');
 });
 
-test('PTK Labs automation bootstrap arms only the uniquely matching active target tab', async () => {
-  const calls = [];
-  const worker = {
-    url: () => 'chrome-extension://labs/app_automation.js',
-    evaluate: async (fn, arg) => {
-      const previousBrowser = global.browser;
-      const previousChrome = global.chrome;
-      const previousAutomation = global.PTK_EXTENSION_AUTOMATION;
-      global.browser = {
-        tabs: {
-          async query(query) {
-            calls.push(['query', query]);
-            return [{ id: 41, active: true, url: 'https://shop.example.test/cart' }];
-          }
-        },
-        runtime: {
-          getURL(file) {
-            return `chrome-extension://labs/${file}`;
-          }
-        }
-      };
-      global.PTK_EXTENSION_AUTOMATION = {
-        extension: {
-          contentRuntime: {
-            armPrimaryTab(input) {
-              calls.push(['arm', input]);
-              return { ok: true, grantId: 'primary-41', expiresAt: 61000 };
-            }
-          }
-        }
-      };
-      try {
-        return await fn(arg);
-      } finally {
-        if (previousBrowser === undefined) delete global.browser;
-        else global.browser = previousBrowser;
-        if (previousChrome === undefined) delete global.chrome;
-        else global.chrome = previousChrome;
-        if (previousAutomation === undefined) delete global.PTK_EXTENSION_AUTOMATION;
-        else global.PTK_EXTENSION_AUTOMATION = previousAutomation;
-      }
+test('PTK Labs automation uses current-document activation without service-worker access', async () => {
+  const fs = require('node:fs');
+  const os = require('node:os');
+  const path = require('node:path');
+  const extensionDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ptk-current-document-'));
+  fs.writeFileSync(path.join(extensionDir, 'manifest.json'), JSON.stringify({
+    manifest_version: 3,
+    name: 'PTK Automation Extension',
+    version: '0.0.0',
+    background: {
+      service_worker: 'automation/background/automation-background-entry.js',
+      type: 'module'
+    },
+    content_scripts: [{
+      matches: ['<all_urls>'],
+      js: [
+        'runtime/content/iast-document-start-relay.js',
+        'automation/content/automation-content-entry.js'
+      ],
+      run_at: 'document_start',
+      all_frames: true
+    }]
+  }), 'utf8');
+
+  const context = {
+    serviceWorkers() {
+      throw new Error('current-document activation must not inspect private extension workers');
     }
   };
-  const context = { serviceWorkers: () => [worker] };
-
   const result = await enablePtkAutomationInExtension(context, {
-    timeoutMs: 10,
-    targetUrl: 'https://shop.example.test/cart',
-    targetScope: {
-      baseUrl: 'https://shop.example.test/',
-      origin: 'https://shop.example.test',
-      include: ['https://shop.example.test/**'],
-      exclude: ['https://shop.example.test/logout']
-    }
+    extensionPath: extensionDir,
+    timeoutMs: 10
   });
 
-  assert.equal(result.ok, true);
-  assert.equal(result.implementation, 'ptklabs');
-  assert.equal(result.tabId, 41);
-  assert.equal(result.grantId, 'primary-41');
-  assert.deepEqual(calls[1][1].targetScope, {
-    origins: [],
-    urls: ['https://shop.example.test/**'],
-    excludeUrls: ['https://shop.example.test/logout']
+  assert.deepEqual(result, {
+    ok: true,
+    implementation: 'ptklabs',
+    activation: 'current-document-page-bridge',
+    workerUrl: null
   });
-  assert.equal(calls[1][1].caller.trusted, true);
-  assert.equal(calls[1][1].ttlMs, 60000);
-});
-
-test('PTK Labs automation bootstrap requires a target and rejects ambiguous matches', async () => {
-  const worker = {
-    url: () => 'chrome-extension://labs/app_automation.js',
-    evaluate: async (fn, arg) => {
-      const previousBrowser = global.browser;
-      const previousChrome = global.chrome;
-      const previousAutomation = global.PTK_EXTENSION_AUTOMATION;
-      global.browser = {
-        tabs: {
-          async query() {
-            return [
-              { id: 41, url: 'https://shop.example.test/cart' },
-              { id: 42, url: 'https://shop.example.test/cart' }
-            ];
-          }
-        },
-        runtime: { getURL: file => `chrome-extension://labs/${file}` }
-      };
-      global.PTK_EXTENSION_AUTOMATION = {
-        extension: {
-          contentRuntime: {
-            armPrimaryTab() {
-              throw new Error('ambiguous target must not be armed');
-            }
-          }
-        }
-      };
-      try {
-        return await fn(arg);
-      } finally {
-        if (previousBrowser === undefined) delete global.browser;
-        else global.browser = previousBrowser;
-        if (previousChrome === undefined) delete global.chrome;
-        else global.chrome = previousChrome;
-        if (previousAutomation === undefined) delete global.PTK_EXTENSION_AUTOMATION;
-        else global.PTK_EXTENSION_AUTOMATION = previousAutomation;
-      }
-    }
-  };
-  const context = { serviceWorkers: () => [worker] };
-
-  const missing = await enablePtkAutomationInExtension(context, { timeoutMs: 10 });
-  assert.equal(missing.ok, false);
-  assert.equal(missing.code, 'ptk_target_tab_required');
-
-  const ambiguous = await enablePtkAutomationInExtension(context, {
-    timeoutMs: 10,
-    targetUrl: 'https://shop.example.test/cart'
-  });
-  assert.equal(ambiguous.ok, false);
-  assert.equal(ambiguous.code, 'ptk_target_tab_ambiguous');
 });
 
 test('automation grant scope maps Agent include/exclude rules without widening them', () => {

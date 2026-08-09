@@ -6,7 +6,6 @@ export const PtkScanError = cjs.PtkScanError;
 export const createPtkBridge = cjs.createPtkBridge;
 export const waitForPtk = cjs.waitForPtk;
 export const bootstrapPtkPage = cjs.bootstrapPtkPage;
-export const armPtkIastForNavigation = cjs.armPtkIastForNavigation;
 export const withPtkScan = cjs.withPtkScan;
 export const collectPtkResults = cjs.collectPtkResults;
 export const applyAutomationScanDefaults = cjs.applyAutomationScanDefaults;

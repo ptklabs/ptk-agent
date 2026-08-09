@@ -10,7 +10,7 @@ Read the [provider guide](https://github.com/ptklabs/ptk-agent/blob/main/docs/np
 | --- | --- | --- |
 | Browserbase | `pentestkit/providers/browserbase` | Playwright, Puppeteer, Selenium |
 | Browserless | `pentestkit/providers/browserless` | Playwright, Puppeteer |
-| BrowserStack | `pentestkit/providers/browserstack` | Selenium |
+| BrowserStack | `pentestkit/providers/browserstack` | Playwright, Puppeteer, Selenium |
 | Hyperbrowser | `pentestkit/providers/hyperbrowser` | Playwright, Puppeteer; Selenium is account-dependent |
 | Steel | `pentestkit/providers/steel` | Playwright, Puppeteer |
 | TestMu | `pentestkit/providers/testmu` | Playwright, Puppeteer, Selenium |

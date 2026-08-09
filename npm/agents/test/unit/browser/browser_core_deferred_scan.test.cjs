@@ -118,7 +118,7 @@ test('withPtkScan deferred mode reports PTK_SCAN_NOT_STARTED when callback never
   assert.equal(bridge.calls.endSession, 0);
 });
 
-test('withPtkScan invokes the framework pre-navigation arm before bootstrap navigation', async () => {
+test('withPtkScan navigates to the bootstrap page before starting the normal page bridge session', async () => {
   const page = createMockPage();
   const bridge = createMockBridge();
   const order = [];
@@ -137,19 +137,12 @@ test('withPtkScan invokes the framework pre-navigation arm before bootstrap navi
     bridge,
     bootstrapUrl: 'https://example.test/scoped/',
     engines: ['IAST'],
-    preNavigationArmOperation: async (targetUrl, options) => {
-      order.push(`arm:${targetUrl}`);
-      assert.deepEqual(options.scanOptions.engines, ['IAST']);
-      return { ok: true, applicable: true, armed: true };
-    },
     stop: { wait: false }
   }, async () => null);
 
   assert.equal(result.ok, true);
-  assert.deepEqual(order.slice(0, 3), [
-    'arm:https://example.test/scoped/',
+  assert.deepEqual(order.slice(0, 2), [
     'goto:https://example.test/scoped/',
     'waitReady'
   ]);
-  assert.equal(result.preNavigationArm.armed, true);
 });

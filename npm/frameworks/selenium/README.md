@@ -19,12 +19,13 @@ const { withPtkScan } = require("pentestkit/selenium");
 The adapter converts Selenium's `driver.executeAsyncScript()` into the page-like bridge used by the common PTK helpers. It exports:
 
 - `withPtkScan(driver, options, runJourney)`
-- `armPtkIastForNavigation(driver, options)`
 - `waitForPtk(driver, options)`
 - `createSeleniumPtkBridge(driver, options)`
 - `collectPtkResults(driverOrBridge, session, options)`
 
-It does not install PTK into the browser. Use a prepared profile or a browser build that accepts unpacked extension loading.
+It does not install PTK into the browser. Your test owns browser creation: use
+the packaged signed XPI for Firefox, a prepared profile, or a Chromium build
+that accepts unpacked extension loading.
 
 ## Basic Usage
 
@@ -116,14 +117,38 @@ Use `PTK_EXTENSION_PATH` only when testing a custom unpacked extension:
 export PTK_EXTENSION_PATH=/absolute/path/to/custom-ptk-auto
 ```
 
+### Firefox Signed XPI
+
+Resolve the AMO-signed Firefox artifact from the installed package and add it
+to Selenium's generated profile before Firefox starts:
+
+```js
+const { Builder } = require("selenium-webdriver");
+const firefox = require("selenium-webdriver/firefox");
+const { ensurePtkXpi } = require("pentestkit/extensions");
+
+const xpiPath = ensurePtkXpi().path;
+const options = new firefox.Options()
+  .addExtensions(xpiPath);
+
+const driver = await new Builder()
+  .forBrowser("firefox")
+  .setFirefoxOptions(options)
+  .build();
+```
+
+Configure the XPI before `build()`. Installing it after Firefox has started can
+miss the first document-start bridge. Firefox assigns the WebExtension origin;
+PTK Agent does not require or configure a fixed `moz-extension://` UUID.
+
 ## Options
 
 | Option | Purpose |
 | --- | --- |
 | `project` | PTK project/session label. |
 | `engines` | Engines to enable, for example `["DAST", "IAST", "SAST"]`. |
-| `bootstrapUrl` | Recommended first application URL. IAST is armed for this exact scope before navigation. |
-| `deferStart` | Lets a custom callback own navigation; call its `armPtkIastForNavigation(targetUrl)` helper before the first `driver.get()` when IAST is selected. |
+| `bootstrapUrl` | Recommended first application URL. PTK navigates there before starting the page-bridge session. |
+| `deferStart` | Lets a custom callback own navigation; call `startPtkScan()` after the first authorised `driver.get()`. |
 | `policyCode` | Optional DAST policy code. |
 | `resultsDir` | Directory where wrapper artifacts are written. |
 | `artifactMode` | `report` writes `report.json` and `findings.json`; `debug` writes lifecycle diagnostics. Defaults to `report`. |
@@ -133,8 +158,6 @@ export PTK_EXTENSION_PATH=/absolute/path/to/custom-ptk-auto
 | `stop.immediateAnalysis` | `false` defers stop-time analysis until import/load/recompute in PTK. |
 | `collect.afterStop` | Collect findings/stats/progress after stop. |
 | `switchToDefaultContent` | Defaults to `true`; switch out of iframes before bridge calls. |
-
-Firefox uses an inert extension iframe in a fresh `about:blank` tab for this handshake because GeckoDriver blocks direct top-level `moz-extension://` navigation. It does not enable Firefox system access, expose scan data to websites, or reload the target application.
 
 ## Juice Shop Example
 
@@ -147,7 +170,7 @@ node node_modules/pentestkit/frameworks/selenium/examples/juice-shop-selenium.cj
 
 ## Troubleshooting
 
-`PTK bridge not ready` means Selenium reached the page but page JavaScript cannot see `window.PTK_AUTOMATION`. Check that PTK is installed in the exact profile Selenium launched and Automation Mode is enabled.
+`PTK bridge not ready` means Selenium reached the page but page JavaScript cannot see `window.PTK_AUTOMATION`. For Firefox, confirm that the signed XPI was supplied through `Options.addExtensions()` before `build()`. For a prepared profile, check that PTK is installed in the exact profile Selenium launched and Automation Mode is enabled.
 
 The SDK does not silently request activation. Use an automation-enabled PTK artifact, enable Automation Mode in the prepared profile, or pass `wait: { activate: true }` only from a trusted page you control.
 

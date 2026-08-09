@@ -311,6 +311,17 @@ function resolvePtkServiceWorkerPath(extensionPath) {
   }
 }
 
+function extensionUsesCurrentDocumentActivation(extensionPath) {
+  if (!extensionPath) return false;
+  try {
+    const manifest = JSON.parse(fs.readFileSync(path.join(extensionPath, 'manifest.json'), 'utf8'));
+    const background = manifest && manifest.background || {};
+    return /automation\/background\/automation-background/iu.test(String(background.service_worker || background.page || ''));
+  } catch (_) {
+    return false;
+  }
+}
+
 function normalizeWorkerWaitOptions(options = {}) {
   if (options && typeof options === 'object' && !Array.isArray(options)) {
     return {
@@ -356,6 +367,14 @@ async function waitForPtkServiceWorker(context, options = 10000) {
 }
 
 async function enablePtkAutomationInExtension(context, options = {}) {
+  if (extensionUsesCurrentDocumentActivation(options.extensionPath || null)) {
+    return {
+      ok: true,
+      implementation: 'ptklabs',
+      activation: 'current-document-page-bridge',
+      workerUrl: null
+    };
+  }
   const worker = await waitForPtkServiceWorker(context, {
     extensionPath: options.extensionPath || null,
     timeoutMs: options.timeoutMs || 10000
@@ -367,112 +386,8 @@ async function enablePtkAutomationInExtension(context, options = {}) {
       message: 'PTK extension service worker was not found'
     };
   }
-  const targetUrl = options.targetUrl ? String(options.targetUrl) : null;
-  const targetScope = automationGrantScope(options.targetScope || null, targetUrl);
-  const result = await worker.evaluate(async ({ targetUrl: expectedTargetUrl, targetScope: expectedTargetScope, ttlMs }) => {
+  const result = await worker.evaluate(async () => {
     const api = typeof browser !== 'undefined' ? browser : chrome;
-    const candidate = [
-      globalThis.PTK_EXTENSION_AUTOMATION,
-      globalThis.PTK_EXTENSION_FULL,
-      globalThis.PTK_EXTENSION_FULL_DEV
-    ].find(owner => typeof owner?.extension?.contentRuntime?.armPrimaryTab === 'function') || null;
-    const contentRuntime = candidate && candidate.extension && candidate.extension.contentRuntime || null;
-    if (contentRuntime && typeof contentRuntime.armPrimaryTab === 'function') {
-      if (!expectedTargetUrl) {
-        return {
-          ok: false,
-          code: 'ptk_target_tab_required',
-          message: 'PTK Labs automation requires an explicit target tab before activation',
-          implementation: 'ptklabs'
-        };
-      }
-      let normalizedTargetUrl;
-      try {
-        normalizedTargetUrl = new URL(expectedTargetUrl).href;
-      } catch (_) {
-        return {
-          ok: false,
-          code: 'ptk_target_url_invalid',
-          message: 'PTK Labs automation target URL is invalid',
-          implementation: 'ptklabs'
-        };
-      }
-      if (!['http:', 'https:'].includes(new URL(normalizedTargetUrl).protocol)) {
-        return {
-          ok: false,
-          code: 'ptk_target_url_unsupported',
-          message: 'PTK Labs automation target must use HTTP or HTTPS',
-          implementation: 'ptklabs'
-        };
-      }
-      const sameUrl = tab => {
-        try {
-          return new URL(tab && tab.url || '').href === normalizedTargetUrl;
-        } catch (_) {
-          return false;
-        }
-      };
-      const activeTabs = api.tabs && typeof api.tabs.query === 'function'
-        ? await api.tabs.query({ active: true, currentWindow: true })
-        : [];
-      let matches = (Array.isArray(activeTabs) ? activeTabs : []).filter(sameUrl);
-      if (matches.length !== 1 && api.tabs && typeof api.tabs.query === 'function') {
-        const allTabs = await api.tabs.query({});
-        matches = (Array.isArray(allTabs) ? allTabs : []).filter(sameUrl);
-      }
-      if (matches.length !== 1) {
-        return {
-          ok: false,
-          code: matches.length > 1 ? 'ptk_target_tab_ambiguous' : 'ptk_target_tab_not_found',
-          message: matches.length > 1
-            ? 'More than one browser tab matches the PTK automation target URL'
-            : 'No browser tab matches the PTK automation target URL',
-          implementation: 'ptklabs',
-          matchCount: matches.length
-        };
-      }
-      const tab = matches[0];
-      let resolvedGrant;
-      try {
-        const grant = contentRuntime.armPrimaryTab({
-          caller: {
-            trusted: true,
-            source: 'ptk-agent-service-worker'
-          },
-          tab,
-          tabId: tab.id,
-          url: tab.url || normalizedTargetUrl,
-          targetScope: expectedTargetScope,
-          ttlMs
-        });
-        resolvedGrant = grant && typeof grant.then === 'function' ? await grant : grant;
-      } catch (error) {
-        return {
-          ok: false,
-          code: error && error.code || 'ptk_target_arm_failed',
-          message: error && error.message || 'PTK Labs automation target grant was not created',
-          implementation: 'ptklabs'
-        };
-      }
-      if (!resolvedGrant || resolvedGrant.ok === false) {
-        return {
-          ok: false,
-          code: resolvedGrant && (resolvedGrant.code || resolvedGrant.error) || 'ptk_target_arm_failed',
-          message: resolvedGrant && resolvedGrant.message || 'PTK Labs automation target grant was not created',
-          implementation: 'ptklabs'
-        };
-      }
-      return {
-        ok: true,
-        implementation: 'ptklabs',
-        armed: true,
-        tabId: tab.id,
-        targetUrl: tab.url || normalizedTargetUrl,
-        grantId: resolvedGrant.grantId || null,
-        expiresAt: resolvedGrant.expiresAt || null,
-        extensionUrl: api.runtime.getURL('manifest.json')
-      };
-    }
     const app = globalThis.ptk_app || null;
     if (app && app.ready && typeof app.ready.then === 'function') {
       await app.ready.catch(() => null);
@@ -487,10 +402,6 @@ async function enablePtkAutomationInExtension(context, options = {}) {
       storageEnabled: Boolean(storageEnabled),
       extensionUrl: api.runtime.getURL('manifest.json')
     };
-  }, {
-    targetUrl,
-    targetScope,
-    ttlMs: Math.max(1, Math.min(Number(options.ttlMs || 60000), 60000))
   });
   return {
     ...result,

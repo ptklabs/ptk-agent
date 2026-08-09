@@ -10,6 +10,8 @@ function parseArgs(argv = process.argv.slice(2)) {
   const options = {
     extensionTag: null,
     extensionVersion: null,
+    chromiumExtensionVersion: null,
+    firefoxExtensionVersion: null,
     packageVersion: null,
     distTag: null,
     provenanceSha256: null,
@@ -19,6 +21,8 @@ function parseArgs(argv = process.argv.slice(2)) {
     const arg = argv[index];
     if (arg === '--extension-tag') options.extensionTag = argv[++index];
     else if (arg === '--extension-version') options.extensionVersion = argv[++index];
+    else if (arg === '--chromium-extension-version') options.chromiumExtensionVersion = argv[++index];
+    else if (arg === '--firefox-extension-version') options.firefoxExtensionVersion = argv[++index];
     else if (arg === '--package-version') options.packageVersion = argv[++index];
     else if (arg === '--dist-tag') options.distTag = argv[++index];
     else if (arg === '--provenance-sha256') options.provenanceSha256 = argv[++index];
@@ -27,6 +31,19 @@ function parseArgs(argv = process.argv.slice(2)) {
     else throw new Error(`Unknown option: ${arg}`);
   }
   return options;
+}
+
+function parseBrowserExtensionVersion(value, label) {
+  const normalized = String(value || '').trim();
+  const match = normalized.match(/^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:\.(0|[1-9]\d*))?$/);
+  if (!match) {
+    throw new Error(`${label} must contain three or four numeric version components: ${normalized || '(empty)'}`);
+  }
+  return {
+    value: normalized,
+    core: match.slice(1, 4).join('.'),
+    numbers: match.slice(1, 5).filter((part) => part !== undefined).map((part) => Number.parseInt(part, 10))
+  };
 }
 
 function parseSemver(value, label) {
@@ -51,6 +68,17 @@ function compareCore(left, right) {
 
 function validateReleaseIntent(options = {}) {
   const extension = parseSemver(options.extensionVersion, '--extension-version');
+  if (extension.prerelease) {
+    throw new Error('--extension-version must be a final three-part release version');
+  }
+  const chromiumExtension = parseBrowserExtensionVersion(
+    options.chromiumExtensionVersion || extension.value,
+    '--chromium-extension-version'
+  );
+  const firefoxExtension = parseBrowserExtensionVersion(
+    options.firefoxExtensionVersion || extension.value,
+    '--firefox-extension-version'
+  );
   const packageVersion = parseSemver(options.packageVersion, '--package-version');
   const extensionTag = String(options.extensionTag || '').trim();
   if (!/^v?[0-9A-Za-z.+-]+$/.test(extensionTag) || extensionTag.replace(/^v/, '') !== extension.value) {
@@ -60,6 +88,14 @@ function validateReleaseIntent(options = {}) {
   if (!DIST_TAGS.has(distTag)) throw new Error('--dist-tag must be next or latest');
   if (packageVersion.core !== extension.core) {
     throw new Error(`Package core version ${packageVersion.core} must match extension version ${extension.core}`);
+  }
+  for (const [label, browserVersion] of [
+    ['Chromium', chromiumExtension],
+    ['Firefox', firefoxExtension]
+  ]) {
+    if (browserVersion.core !== extension.core) {
+      throw new Error(`${label} extension version ${browserVersion.value} must belong to release family ${extension.core}`);
+    }
   }
   if (distTag === 'next' && !packageVersion.prerelease) {
     throw new Error('The next dist-tag requires a prerelease package version such as 9.9.8-rc.1');
@@ -77,6 +113,8 @@ function validateReleaseIntent(options = {}) {
   return {
     extensionTag,
     extensionVersion: extension.value,
+    chromiumExtensionVersion: chromiumExtension.value,
+    firefoxExtensionVersion: firefoxExtension.value,
     packageVersion: packageVersion.value,
     distTag,
     provenanceSha256
@@ -134,7 +172,11 @@ function main(argv = process.argv.slice(2)) {
   try {
     const options = parseArgs(argv);
     if (options.help) {
-      console.log('Validate an npm release request and optionally confirm version availability with --check-registry.');
+      console.log([
+        'Validate an npm release request and optionally confirm version availability with --check-registry.',
+        'Browser versions default to --extension-version; override an exceptional store version with',
+        '--chromium-extension-version or --firefox-extension-version.'
+      ].join('\n'));
       return 0;
     }
     const intent = validateReleaseIntent(options);
@@ -154,6 +196,7 @@ module.exports = {
   PACKAGE_NAME,
   compareCore,
   parseArgs,
+  parseBrowserExtensionVersion,
   parseSemver,
   validateReleaseIntent,
   verifyRegistryAvailability

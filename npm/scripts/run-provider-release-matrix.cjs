@@ -16,8 +16,8 @@ const ROWS = Object.freeze([
   { provider: 'hyperbrowser', framework: 'playwright', browser: 'Chromium', required: true },
   { provider: 'hyperbrowser', framework: 'puppeteer', browser: 'Chromium', required: true },
   { provider: 'hyperbrowser', framework: 'selenium', browser: 'Chrome', required: false },
-  { provider: 'browserstack', framework: 'playwright', browser: 'Chrome', required: false },
-  { provider: 'browserstack', framework: 'puppeteer', browser: 'Chrome', required: false },
+  { provider: 'browserstack', framework: 'playwright', browser: 'Chrome', required: true },
+  { provider: 'browserstack', framework: 'puppeteer', browser: 'Chrome', required: true },
   { provider: 'browserstack', framework: 'selenium', browser: 'Chrome', required: true },
   { provider: 'steel', framework: 'playwright', browser: 'Chromium', required: true },
   { provider: 'steel', framework: 'puppeteer', browser: 'Chromium', required: true },
@@ -272,7 +272,18 @@ function sanitizeEvidence(payload, redact) {
 
 function classifyFailure(error) {
   const text = String(error && error.message || error || '').toLowerCase();
-  if (/required|credential|api key|access key|username/.test(text)) return 'credentials_missing';
+  if (/cannot find module|module not found|install (?:it|one)|sdk is required/.test(text)) return 'sdk_missing';
+  if (/upload limit|upload quota|quota (?:has been )?(?:reached|exhausted)|reached (?:their|the|your) .*limit/.test(text)) {
+    return 'provider_quota_exhausted';
+  }
+  if (/connection capacity|service unavailable|unexpected server response:\s*503|\b503\b.*service unavailable/.test(text)) {
+    return 'provider_unavailable';
+  }
+  if (/maximum session time|plan's maximum|upgrade your plan/.test(text)) return 'provider_plan_limit';
+  if (/target (?:page, context or browser has been closed|closed)|session (?:expired|closed)/.test(text)) {
+    return 'provider_session_expired';
+  }
+  if (/credential|api[_ ]key|access[_ ]key|username/.test(text)) return 'credentials_missing';
   if (/extension-bearing default.*context/.test(text)) return 'default_context_missing';
   if (/ptk.*not.*ready|bridge/.test(text)) return 'bridge_not_available';
   if (/engine.*participate/.test(text)) return 'engine_incomplete';
@@ -499,12 +510,16 @@ async function main() {
   if (results.some((row) => row.required && row.status !== 'pass')) process.exitCode = 1;
 }
 
-main().catch((error) => {
-  const message = String(error && error.message || error || 'Provider matrix failed');
-  let safeMessage = message;
-  for (const secret of secretValues()) {
-    safeMessage = safeMessage.split(secret).join('[redacted]').split(encodeURIComponent(secret)).join('[redacted]');
-  }
-  console.error(`Provider matrix failed: ${safeMessage}`);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  main().catch((error) => {
+    const message = String(error && error.message || error || 'Provider matrix failed');
+    let safeMessage = message;
+    for (const secret of secretValues()) {
+      safeMessage = safeMessage.split(secret).join('[redacted]').split(encodeURIComponent(secret)).join('[redacted]');
+    }
+    console.error(`Provider matrix failed: ${safeMessage}`);
+    process.exitCode = 1;
+  });
+}
+
+module.exports = { classifyFailure, ROWS };

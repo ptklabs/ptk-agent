@@ -13,7 +13,7 @@ Status meanings:
 | --- | --- | --- | --- | --- |
 | Browserbase | **Supported** | **Supported** | **Supported** | Playwright |
 | Browserless | **Supported** | **Supported** | **Not supported** | Playwright |
-| BrowserStack | **Not supported** | **Not supported** | **Supported** | Selenium with Chrome |
+| BrowserStack | **Supported** | **Supported** | **Supported** | Playwright |
 | Hyperbrowser | **Supported** | **Supported** | **Limited** | Playwright |
 | Steel | **Supported** | **Supported** | **Not supported** | Playwright |
 | TestMu | **Supported** | **Supported** | **Supported** | Playwright over CDP |
@@ -24,7 +24,7 @@ Additional TestMu Cypress and k6 examples are packaged as **example only**. Cypr
 
 - Provider integrations use Chrome or Chromium because the listed providers expose their custom-extension support there.
 - A provider's general support for a framework does not guarantee that custom extensions are supported in that framework.
-- BrowserStack documents Chrome extension testing for Playwright, but PTK Agent does not mark that path supported until PTK Auto bridge availability is consistently confirmed in the remote session.
+- BrowserStack Playwright and Puppeteer use the provider's uploaded-media extension flow; Selenium loads the packaged CRX through Chrome capabilities.
 - Hyperbrowser Selenium can require account-level enablement. Use it only after the provider confirms that the WebDriver endpoint and extensions are available for your account.
 - Browserless v2 does not support Selenium/WebDriver, so PTK Agent exposes Playwright and Puppeteer paths only.
 - Steel supports Selenium sessions generally, but PTK Agent does not currently advertise Steel Selenium because PTK Auto extension loading is not reliable on that path.
@@ -35,6 +35,7 @@ Additional TestMu Cypress and k6 examples are packaged as **example only**. Cypr
 | --- | --- |
 | Browserbase | The helper uploads the packaged Chromium ZIP, or reuses `BROWSERBASE_EXTENSION_ID`. |
 | Browserless | Upload the Chromium ZIP in the Browserless dashboard and set `BROWSERLESS_EXTENSION_NAME`. |
+| BrowserStack Playwright/Puppeteer | The helper creates the required one-parent ZIP, uploads or reuses it, and supplies `browserstack.uploadMedia`. |
 | BrowserStack Selenium | The helper adds the packaged CRX to Chrome capabilities. |
 | Hyperbrowser | The helper uploads the Chromium ZIP, or reuses `HYPERBROWSER_EXTENSION_ID`. |
 | Steel | The helper uploads the Chromium ZIP, or reuses `STEEL_EXTENSION_ID`. |

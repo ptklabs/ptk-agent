@@ -275,6 +275,23 @@ function findBundledExtensionPath(packageRoot) {
   }
 }
 
+function findBundledFirefoxExtensionPath(packageRoot) {
+  const root = packageRoot || findPackageRoot(__dirname);
+  const helperPath = path.join(root, "extensions", "index.cjs");
+  if (!fs.existsSync(helperPath)) return null;
+  try {
+    const helpers = require(helperPath);
+    if (typeof helpers.ensureUnpackedPtkFirefoxExtension !== "function") return null;
+    const result = helpers.ensureUnpackedPtkFirefoxExtension({
+      packageRoot: root,
+      cacheRoot: process.env.PTK_EXTENSION_CACHE_DIR || path.join(process.cwd(), ".ptk")
+    });
+    return result && isPtkExtensionDir(result.path) ? result.path : null;
+  } catch (_) {
+    return null;
+  }
+}
+
 function normalizeExtensionPath(config, required) {
   const extensionPath = getEnvConfigValue(config, "PTK_EXTENSION_PATH");
 
@@ -294,6 +311,26 @@ function normalizeExtensionPath(config, required) {
     "PTK_EXTENSION_PATH",
     "Check PTK_EXTENSION_PATH."
   );
+}
+
+function normalizeFirefoxExtensionPath(config, required) {
+  const extensionPath = getEnvConfigValue(config, "PTK_EXTENSION_FIREFOX_PATH");
+  if (extensionPath) {
+    return normalizeDirectoryPath(
+      extensionPath,
+      "PTK_EXTENSION_FIREFOX_PATH",
+      "Check PTK_EXTENSION_FIREFOX_PATH."
+    );
+  }
+
+  const bundled = findBundledFirefoxExtensionPath();
+  if (bundled) return bundled;
+  if (required) {
+    throw new Error(
+      "PTK_EXTENSION_FIREFOX_PATH is required for Firefox. Set it to an unpacked Firefox extension directory or install the pentestkit package with bundled Firefox artifacts."
+    );
+  }
+  return null;
 }
 
 function resolveCypressAllowedOrigins(config, options) {
@@ -356,8 +393,6 @@ function prepareCypressExtension(sourceExtensionPath, config, options) {
   const preparedExtensionPath = copyExtensionForCypress(sourceExtensionPath, config, options);
   const devLocal = {
     automationEnabled: true,
-    automationAllowChildFrameBootstrap: true,
-    automationChildFrameBootstrapOrigins: allowedOrigins,
   };
   fs.writeFileSync(
     path.join(preparedExtensionPath, "dev.local.json"),
@@ -462,16 +497,29 @@ function setupPtkCypress(on, config, options) {
   const compatMode = resolveCompatMode(config);
   const profilePath = normalizeProfilePath(config);
   const sourceExtensionPath = normalizeExtensionPath(config, !profilePath);
+  const sourceFirefoxExtensionPath = profilePath
+    ? null
+    : normalizeFirefoxExtensionPath(config, false);
   const prepared = profilePath
     ? null
     : prepareCypressExtension(sourceExtensionPath, config, options);
-  const extensionPath = prepared ? prepared.extensionPath : sourceExtensionPath;
+  const firefoxExtensionDir = getEnvConfigValue(config, "PTK_CYPRESS_FIREFOX_EXTENSION_DIR")
+    || (prepared ? `${prepared.extensionPath}-firefox` : "");
+  const preparedFirefox = profilePath || !sourceFirefoxExtensionPath
+    ? null
+    : prepareCypressExtension(sourceFirefoxExtensionPath, config, {
+        ...options,
+        extensionDir: firefoxExtensionDir || undefined,
+      });
 
   if (!config.env || typeof config.env !== "object") config.env = {};
   if (prepared) {
     config.env.PTK_EXTENSION_PATH = prepared.extensionPath;
     config.env.PTK_CYPRESS_SOURCE_EXTENSION_PATH = prepared.sourceExtensionPath;
     config.env.PTK_CYPRESS_ALLOWED_ORIGINS = prepared.allowedOrigins.join(",");
+  }
+  if (preparedFirefox) {
+    config.env.PTK_EXTENSION_FIREFOX_PATH = preparedFirefox.extensionPath;
   }
 
   if (profilePath && sourceExtensionPath) {
@@ -485,6 +533,9 @@ function setupPtkCypress(on, config, options) {
     const compat = resolveBrowserCompatibility(browser, compatMode, config);
     const browserFamily = toLower(browser?.family);
     const browserName = toLower(browser?.name);
+    const isFirefox = browserFamily === "firefox" || browserName === "firefox";
+    const selected = isFirefox ? preparedFirefox : prepared;
+    const extensionPath = selected ? selected.extensionPath : null;
 
     if (compat.status === "unsupported") {
       throw new Error(formatCompatibilityError(compat, browser, compatMode));
@@ -500,13 +551,18 @@ function setupPtkCypress(on, config, options) {
     }
 
     if (profilePath) {
-      const isFirefox = browserFamily === "firefox" || browserName === "firefox";
       if (!isFirefox) {
         throw new Error(
           `[PTK][profile_mode_browser_unsupported] PTK_PROFILE_DIR is supported only with Firefox in Cypress. Browser: ${browser?.name || "unknown"} (${browser?.family || "unknown"}).`
         );
       }
       setFirefoxProfileArgs(launchOptions, profilePath);
+    } else if (!extensionPath) {
+      throw new Error(
+        isFirefox
+          ? "[PTK][firefox_extension_missing] No unpacked PTK Firefox extension is available."
+          : "[PTK][chromium_extension_missing] No unpacked PTK Chromium extension is available."
+      );
     } else if (!launchOptions.extensions.includes(extensionPath)) {
       launchOptions.extensions.push(extensionPath);
     }
@@ -536,7 +592,7 @@ function setupPtkCypress(on, config, options) {
         browser?.version || browser?.majorVersion || "?",
         compatMode,
         compat.status,
-        prepared ? prepared.allowedOrigins.join(",") : "profile"
+        selected ? selected.allowedOrigins.join(",") : "profile"
       );
     }
 
@@ -546,8 +602,8 @@ function setupPtkCypress(on, config, options) {
       executablePath: browser?.path || null,
       headless: browser?.isHeadless === true,
       extensionPath: profilePath ? null : extensionPath,
-      sourceExtensionPath: prepared ? prepared.sourceExtensionPath : null,
-      allowedOrigins: prepared ? prepared.allowedOrigins : null,
+      sourceExtensionPath: selected ? selected.sourceExtensionPath : null,
+      allowedOrigins: selected ? selected.allowedOrigins : null,
       profileMode: profilePath ? "firefox-profile" : "cypress-extension-injection",
       profileDir: profilePath || null,
       launchArgs: launchOptions.args || [],
@@ -581,9 +637,11 @@ module.exports = {
     prepareCypressExtension,
     copyExtensionForCypress,
     findBundledExtensionPath,
+    findBundledFirefoxExtensionPath,
     isPtkExtensionDir,
     normalizeDirectoryPath,
     normalizeExtensionPath,
+    normalizeFirefoxExtensionPath,
     normalizeProfilePath,
     ensureLaunchOptions,
     normalizeChromiumHeadlessArgs,

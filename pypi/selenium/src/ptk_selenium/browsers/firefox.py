@@ -1,12 +1,9 @@
-import json
 import os
 import sys
 from selenium import webdriver
+from selenium.webdriver import FirefoxProfile
 from selenium.webdriver.firefox.options import Options as FirefoxOptions
 from .base import BrowserLauncher
-
-
-DEFAULT_FIREFOX_EXTENSION_UUID = "7b4b556d-55d0-4db7-bf08-7c1ec1a0f5c5"
 
 
 class FirefoxLauncher(BrowserLauncher):
@@ -119,8 +116,13 @@ class FirefoxLauncher(BrowserLauncher):
             options.binary_location = self.binary_location
 
         if self.profile_dir:
-            options.add_argument("-profile")
-            options.add_argument(self.profile_dir)
+            if self.install_mode == "temporary" and self.extension_xpi_path:
+                startup_profile = FirefoxProfile(self.profile_dir)
+                startup_profile.add_extension(self.extension_xpi_path)
+                options.profile = startup_profile
+            else:
+                options.add_argument("-profile")
+                options.add_argument(self.profile_dir)
             options.add_argument("-no-remote")
 
         options.set_preference("browser.shell.checkDefaultBrowser", False)
@@ -133,14 +135,6 @@ class FirefoxLauncher(BrowserLauncher):
         options.set_preference("extensions.enabledScopes", 15)
         options.set_preference("extensions.installDistroAddons", True)
         options.set_preference("extensions.webextensions.restrictedDomains", "")
-        extension_uuid = os.environ.get(
-            "PTK_FIREFOX_EXTENSION_UUID",
-            DEFAULT_FIREFOX_EXTENSION_UUID,
-        )
-        options.set_preference("extensions.webextensions.uuids", json.dumps({
-            "pentestkit@DenisPodgurskii": extension_uuid,
-            "ptk-automation-agent@ptklabs.com": extension_uuid,
-        }))
         options.set_preference("xpinstall.signatures.required", False)
 
         for key, value in self.prefs.items():
@@ -157,9 +151,4 @@ class FirefoxLauncher(BrowserLauncher):
     def launch(self) -> webdriver.Firefox:
         """Launch Firefox and optionally install extension as temporary addon."""
         options = self.build_options()
-        driver = webdriver.Firefox(options=options)
-
-        if self.install_mode == "temporary" and self.extension_xpi_path:
-            driver.install_addon(self.extension_xpi_path, temporary=True)
-
-        return driver
+        return webdriver.Firefox(options=options)
