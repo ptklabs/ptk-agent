@@ -63,6 +63,8 @@
   "scenario": {
     "enabled": false,
     "file": null,
+    "inputType": "scenario",
+    "format": "auto",
     "continueOnFailure": false
   },
   "agent": {

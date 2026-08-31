@@ -47,6 +47,11 @@ const REQUIRED_GITIGNORE_ENTRIES = [
   '__pycache__/',
   '*.egg-info/'
 ];
+const LOCAL_DEMO_FIXTURE_ROOT = 'npm/agents/test/fixtures/macro/juice-shop/';
+
+function isAllowedLocalDemoCredential(relative, label) {
+  return label === 'known local test credential' && relative.startsWith(LOCAL_DEMO_FIXTURE_ROOT);
+}
 
 function walkRepository(root = REPOSITORY_ROOT) {
   const files = [];
@@ -97,6 +102,7 @@ function secretFindings(filePath, relative) {
   for (const [label, pattern] of patterns) {
     for (const match of text.matchAll(pattern)) {
       if (relative === 'npm/scripts/prepare-npm-package.cjs' && label === 'known local test credential') continue;
+      if (isAllowedLocalDemoCredential(relative, label)) continue;
       const line = text.slice(0, match.index).split('\n').length;
       findings.push(`${label} in ${relative}:${line}`);
     }
@@ -175,6 +181,7 @@ module.exports = {
   REPOSITORY_ROOT,
   auditRepository,
   documentationAudienceFindings,
+  isAllowedLocalDemoCredential,
   secretFindings,
   suspiciousFileReason,
   verifyGitignore,

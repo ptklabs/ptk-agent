@@ -11,7 +11,8 @@
     "pack:dry-run": "npm --cache .release/npm/.npm-cache pack --dry-run --json .release/npm/pentestkit",
     "test:agents": "npm --prefix agents test",
     "test:smoke-helpers": "node --test scripts/framework-smoke-helpers.test.cjs",
-    "test:ci": "npm run audit:repository && npm run test:smoke-helpers && npm run test:agents",
+    "test:package-contract": "node --test scripts/package-dependency-contract.test.cjs scripts/audit-repository.test.cjs",
+    "test:ci": "npm run audit:repository && npm run test:smoke-helpers && npm run test:package-contract && npm run test:agents",
     "test:package": "node scripts/smoke-packed-package.cjs .release/npm",
     "test:release-package": "node scripts/prepare-npm-package.cjs",
     "preflight:release-frameworks": "node scripts/preflight-release-frameworks.cjs",
@@ -20,7 +21,6 @@
     "test:release": "npm run test:release-package && npm run test:release-frameworks -- --mode package"
   },
   "devDependencies": {
-    "puppeteer-core": "24.10.0",
     "selenium-webdriver": "4.26.0"
   },
   "engines": {

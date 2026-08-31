@@ -15,7 +15,25 @@ const STEP_TYPES = Object.freeze([
   'upload-file',
   'cart-add',
   'checkout-advance',
-  'assert-state'
+  'assert-state',
+  'macro-navigate',
+  'macro-click',
+  'macro-doubleClick',
+  'macro-fill',
+  'macro-select',
+  'macro-submit',
+  'macro-keyPress',
+  'macro-scroll',
+  'macro-hover',
+  'macro-waitForElement',
+  'macro-waitForNavigation',
+  'macro-delay',
+  'macro-setWindowSize',
+  'macro-selectWindow',
+  'macro-assertText',
+  'macro-assertUrl',
+  'macro-assertElement',
+  'macro-comment'
 ]);
 
 const STEP_TYPE_SET = new Set(STEP_TYPES);

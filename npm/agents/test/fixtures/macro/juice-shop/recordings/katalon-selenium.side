@@ -1,0 +1,850 @@
+{
+  "id": "ptk-katalon-project-juice-shop",
+  "version": "2.0",
+  "name": "Juice Shop visible journey (Katalon-derived)",
+  "url": "http://localhost:3001",
+  "tests": [
+    {
+      "id": "ptk-katalon-test-juice-shop",
+      "name": "Authenticated visible journey",
+      "commands": [
+        {
+          "id": "ptk-katalon-command-0001",
+          "comment": "",
+          "command": "open",
+          "target": "http://localhost:3001/#/",
+          "targets": [
+            [
+              "http://localhost:3001/#/",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0002",
+          "comment": "Accepted with the stable welcome-banner accessibility locator.",
+          "command": "click",
+          "target": "css=button[aria-label=\"Close Welcome Banner\"]",
+          "targets": [
+            [
+              "css=button[aria-label=\"Close Welcome Banner\"]",
+              "css:finder"
+            ],
+            [
+              "xpath=//mat-dialog-container[@id='mat-mdc-dialog-0']/div/div/app-welcome-banner/div[2]/button[2]/span[2]/span",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Help getting started'])[2]/following::span[5]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='https://owasp-juice.shop'])[1]/following::span[8]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Katalon Recorder is recording ...'])[1]/preceding::span[4]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Stop'])[1]/preceding::span[4]",
+              ""
+            ],
+            [
+              "xpath=//*/text()[normalize-space(.)='Dismiss']/parent::*",
+              ""
+            ],
+            [
+              "xpath=//button[2]/span[2]/span",
+              ""
+            ],
+            [
+              "css=span.mdc-button__label > span.hide-lt-sm",
+              ""
+            ]
+          ],
+          "value": "",
+          "ptkOptional": true
+        },
+        {
+          "id": "ptk-katalon-command-0003",
+          "comment": "",
+          "command": "click",
+          "target": "link=Me want it!",
+          "targets": [
+            [
+              "link=Me want it!",
+              ""
+            ],
+            [
+              "xpath=//a[contains(text(),'Me want it!')]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='But me wait!'])[1]/following::a[1]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='OWASP Juice Shop'])[2]/preceding::a[1]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Account'])[1]/preceding::a[1]",
+              ""
+            ],
+            [
+              "xpath=//*/text()[normalize-space(.)='Me want it!']/parent::*",
+              ""
+            ],
+            [
+              "xpath=//div/a",
+              ""
+            ],
+            [
+              "css=a.cc-btn.cc-dismiss",
+              ""
+            ]
+          ],
+          "value": "",
+          "ptkOptional": true
+        },
+        {
+          "id": "ptk-journey-account-before-login",
+          "comment": "Added during fixture acceptance because Katalon did not persist the account-menu toggle that exposed its recorded Login click.",
+          "command": "click",
+          "target": "id=navbarAccount",
+          "targets": [
+            [
+              "id=navbarAccount",
+              "id"
+            ],
+            [
+              "css=#navbarAccount",
+              "css:finder"
+            ],
+            [
+              "xpath=//*[@id='navbarAccount']",
+              "xpath:attributes"
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0004",
+          "comment": "",
+          "command": "click",
+          "target": "xpath=//button[@id='navbarLoginButton']/span/span",
+          "targets": [
+            [
+              "xpath=//button[@id='navbarLoginButton']/span/span",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Click for more information'])[1]/following::span[2]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Choose language'])[1]/following::span[2]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Katalon Recorder is recording ...'])[1]/preceding::span[1]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Stop'])[1]/preceding::span[1]",
+              ""
+            ],
+            [
+              "xpath=//div/button/span/span",
+              ""
+            ],
+            [
+              "css=span.mat-mdc-menu-item-text > span",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0005",
+          "comment": "",
+          "command": "click",
+          "target": "id=email",
+          "targets": [
+            [
+              "id=email",
+              ""
+            ],
+            [
+              "name=email",
+              ""
+            ],
+            [
+              "xpath=//input[@id='email']",
+              ""
+            ],
+            [
+              "xpath=//div[@id='login-form']/mat-form-field/div/div/div[2]/input",
+              ""
+            ],
+            [
+              "xpath=//div[2]/input",
+              ""
+            ],
+            [
+              "css=#email",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0006",
+          "comment": "",
+          "command": "type",
+          "target": "id=email",
+          "targets": [
+            [
+              "id=email",
+              ""
+            ],
+            [
+              "name=email",
+              ""
+            ],
+            [
+              "xpath=//input[@id='email']",
+              ""
+            ],
+            [
+              "xpath=//div[@id='login-form']/mat-form-field/div/div/div[2]/input",
+              ""
+            ],
+            [
+              "xpath=//div[2]/input",
+              ""
+            ],
+            [
+              "css=#email",
+              ""
+            ]
+          ],
+          "value": "ptk@test.com"
+        },
+        {
+          "id": "ptk-katalon-command-0007",
+          "comment": "",
+          "command": "click",
+          "target": "id=password",
+          "targets": [
+            [
+              "id=password",
+              ""
+            ],
+            [
+              "name=password",
+              ""
+            ],
+            [
+              "xpath=//input[@id='password']",
+              ""
+            ],
+            [
+              "xpath=//div[@id='login-form']/mat-form-field[2]/div/div/div[2]/input",
+              ""
+            ],
+            [
+              "xpath=//mat-form-field[2]/div/div/div[2]/input",
+              ""
+            ],
+            [
+              "css=#password",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0008",
+          "comment": "",
+          "command": "type",
+          "target": "id=password",
+          "targets": [
+            [
+              "id=password",
+              ""
+            ],
+            [
+              "name=password",
+              ""
+            ],
+            [
+              "xpath=//input[@id='password']",
+              ""
+            ],
+            [
+              "xpath=//div[@id='login-form']/mat-form-field[2]/div/div/div[2]/input",
+              ""
+            ],
+            [
+              "xpath=//mat-form-field[2]/div/div/div[2]/input",
+              ""
+            ],
+            [
+              "css=#password",
+              ""
+            ]
+          ],
+          "value": "P@ssword"
+        },
+        {
+          "id": "ptk-katalon-command-0009",
+          "comment": "",
+          "command": "click",
+          "target": "xpath=//button[@id='loginButton']/span[2]",
+          "targets": [
+            [
+              "xpath=//button[@id='loginButton']/span[2]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Forgot your password?'])[1]/following::span[2]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Password'])[1]/following::span[6]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Remember me'])[1]/preceding::span[4]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Not yet a customer?'])[1]/preceding::span[4]",
+              ""
+            ],
+            [
+              "xpath=//*/text()[normalize-space(.)='Log in']/parent::*",
+              ""
+            ],
+            [
+              "xpath=//div/button/span[2]",
+              ""
+            ],
+            [
+              "css=#loginButton > span.mdc-button__label",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0010",
+          "comment": "Accepted with the stable account-menu trigger.",
+          "command": "click",
+          "target": "id=navbarAccount",
+          "targets": [
+            [
+              "id=navbarAccount",
+              "id"
+            ],
+            [
+              "xpath=//button[@id='navbarAccount']/span[2]/span",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='OWASP Juice Shop'])[4]/following::span[7]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='v19.1.0'])[1]/following::span[13]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Your Basket'])[1]/preceding::span[5]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='EN'])[1]/preceding::span[11]",
+              ""
+            ],
+            [
+              "xpath=//span[2]/span",
+              ""
+            ],
+            [
+              "css=span.mdc-button__label > span",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0011",
+          "comment": "Accepted with the stable profile accessibility locator.",
+          "command": "click",
+          "target": "css=button[aria-label=\"Go to user profile\"]",
+          "targets": [
+            [
+              "css=button[aria-label=\"Go to user profile\"]",
+              "css:finder"
+            ],
+            [
+              "xpath=//div[@id='mat-menu-panel-0']/div/button/span/span",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Click for more information'])[1]/following::span[2]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Choose language'])[1]/following::span[2]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Orders & Payment'])[2]/preceding::span[1]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Privacy & Security'])[2]/preceding::span[3]",
+              ""
+            ],
+            [
+              "xpath=//div/div/div/button/span/span",
+              ""
+            ],
+            [
+              "css=span.mat-mdc-menu-item-text > span",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0012",
+          "comment": "",
+          "command": "open",
+          "target": "http://localhost:3001/profile",
+          "targets": [
+            [
+              "http://localhost:3001/profile",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0013",
+          "comment": "Replaced Katalon's brittle icon XPath with the recorded profile-page brand link.",
+          "command": "click",
+          "target": "link=OWASP Juice Shop",
+          "targets": [
+            [
+              "link=OWASP Juice Shop",
+              "link text"
+            ],
+            [
+              "css=a[href=\"/#/\"]",
+              "css:finder"
+            ],
+            [
+              "xpath=//a[normalize-space(.)='OWASP Juice Shop']",
+              "xpath:attributes"
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Back'])[1]/preceding::i[1]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='OWASP Juice Shop'])[2]/preceding::i[1]",
+              ""
+            ],
+            [
+              "xpath=//*/text()[normalize-space(.)='arrow_back']/parent::*",
+              ""
+            ],
+            [
+              "xpath=//i",
+              ""
+            ],
+            [
+              "css=i.material-icons",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0014",
+          "comment": "",
+          "command": "open",
+          "target": "http://localhost:3001/#/",
+          "targets": [
+            [
+              "http://localhost:3001/#/",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-journey-dismiss-returned-welcome",
+          "comment": "Conditional onboarding repair after the profile page performs a full return navigation.",
+          "command": "click",
+          "target": "css=button[aria-label=\"Close Welcome Banner\"]",
+          "targets": [
+            [
+              "css=button[aria-label=\"Close Welcome Banner\"]",
+              "css:finder"
+            ]
+          ],
+          "value": "",
+          "ptkOptional": true
+        },
+        {
+          "id": "ptk-katalon-command-0015",
+          "comment": "Accepted with a stable first-product basket locator.",
+          "command": "click",
+          "target": "xpath=(//button[@aria-label='Add to Basket'])[1]",
+          "targets": [
+            [
+              "xpath=(//button[@aria-label='Add to Basket'])[1]",
+              "xpath:attributes"
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Apple Juice (1000ml)'])[1]/following::span[4]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='All Products'])[1]/following::span[4]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Apple Pomace'])[1]/preceding::span[4]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Add to Basket'])[2]/preceding::span[6]",
+              ""
+            ],
+            [
+              "xpath=//*/text()[normalize-space(.)='Add to Basket']/parent::*",
+              ""
+            ],
+            [
+              "xpath=//div[2]/button/span[2]/span",
+              ""
+            ],
+            [
+              "css=button.mdc-button.mat-mdc-button-base.btn-basket.mdc-button--raised.mat-mdc-raised-button.mat-primary.ng-star-inserted.cdk-focused.cdk-mouse-focused > span.mdc-button__label > span",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0016",
+          "comment": "Accepted with a stable second-product basket locator.",
+          "command": "click",
+          "target": "xpath=(//button[@aria-label='Add to Basket'])[2]",
+          "targets": [
+            [
+              "xpath=(//button[@aria-label='Add to Basket'])[2]",
+              "xpath:attributes"
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Apple Pomace'])[1]/following::span[4]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Add to Basket'])[1]/following::span[7]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Banana Juice (1000ml)'])[1]/preceding::span[4]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Add to Basket'])[3]/preceding::span[6]",
+              ""
+            ],
+            [
+              "xpath=//mat-grid-tile[2]/div/mat-card/div/div[2]/button/span[2]/span",
+              ""
+            ],
+            [
+              "css=button.mdc-button.mat-mdc-button-base.btn-basket.mdc-button--raised.mat-mdc-raised-button.mat-primary.ng-star-inserted.cdk-focused.cdk-mouse-focused > span.mdc-button__label > span",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0017",
+          "comment": "Accepted with the stable shopping-cart accessibility locator.",
+          "command": "click",
+          "target": "css=button[aria-label=\"Show the shopping cart\"]",
+          "targets": [
+            [
+              "css=button[aria-label=\"Show the shopping cart\"]",
+              "css:finder"
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Account'])[2]/following::span[5]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='OWASP Juice Shop'])[4]/following::span[12]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='EN'])[1]/preceding::span[6]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='All Products'])[1]/preceding::span[10]",
+              ""
+            ],
+            [
+              "xpath=//*/text()[normalize-space(.)='Your Basket']/parent::*",
+              ""
+            ],
+            [
+              "xpath=//button[4]/span[2]/span",
+              ""
+            ],
+            [
+              "css=span.hide-lt-md",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0018",
+          "comment": "Accepted with the stable basket trash-icon locator, promoted by PTK to its button.",
+          "command": "click",
+          "target": "css=svg[data-icon=\"trash-alt\"]",
+          "targets": [
+            [
+              "css=svg[data-icon=\"trash-alt\"]",
+              "css:finder"
+            ],
+            [
+              "xpath=//mat-cell[5]/button/span[3]",
+              ""
+            ],
+            [
+              "css=button.mdc-icon-button.mat-mdc-icon-button.mat-mdc-button-base.mat-unthemed.cdk-focused.cdk-mouse-focused > span.mat-mdc-button-touch-target",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0019",
+          "comment": "Accepted with the stable homepage accessibility locator.",
+          "command": "click",
+          "target": "css=button[aria-label=\"Back to homepage\"]",
+          "targets": [
+            [
+              "css=button[aria-label=\"Back to homepage\"]",
+              "css:finder"
+            ],
+            [
+              "xpath=//div[@id='homeButton']/span",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='v19.1.0'])[1]/following::span[6]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='OWASP Juice Shop'])[3]/following::span[7]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Account'])[2]/preceding::span[7]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Your Basket'])[1]/preceding::span[12]",
+              ""
+            ],
+            [
+              "xpath=//span[2]/div/span",
+              ""
+            ],
+            [
+              "css=span.hide-lt-sm",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0020",
+          "comment": "Accepted with the stable search control class.",
+          "command": "click",
+          "target": "css=.mat-search_icon-search",
+          "targets": [
+            [
+              "css=.mat-search_icon-search",
+              "css:finder"
+            ],
+            [
+              "xpath=//app-mat-search-bar[@id='searchQuery']/span/mat-icon[2]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='OWASP Juice Shop'])[4]/following::mat-icon[2]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='v19.1.0'])[1]/following::mat-icon[3]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Account'])[2]/preceding::mat-icon[2]",
+              ""
+            ],
+            [
+              "xpath=(.//*[normalize-space(text()) and normalize-space(.)='Your Basket'])[1]/preceding::mat-icon[3]",
+              ""
+            ],
+            [
+              "xpath=//*/text()[normalize-space(.)='search']/parent::*",
+              ""
+            ],
+            [
+              "xpath=//app-mat-search-bar/span/mat-icon[2]",
+              ""
+            ],
+            [
+              "css=mat-icon.mat-icon.notranslate.mat-ripple.mat-search_icon-search.ng-tns-c2529363319-0.material-icons.mat-ligature-font.mat-icon-no-color",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0021",
+          "comment": "Accepted with a stable search container locator.",
+          "command": "click",
+          "target": "css=#searchQuery input",
+          "targets": [
+            [
+              "css=#searchQuery input",
+              "css:finder"
+            ],
+            [
+              "id=mat-input-1",
+              ""
+            ],
+            [
+              "xpath=//input[@id='mat-input-1']",
+              ""
+            ],
+            [
+              "xpath=//app-mat-search-bar[@id='searchQuery']/mat-form-field/div/div[2]/div/input",
+              ""
+            ],
+            [
+              "xpath=//input",
+              ""
+            ],
+            [
+              "css=#mat-input-1",
+              ""
+            ]
+          ],
+          "value": ""
+        },
+        {
+          "id": "ptk-katalon-command-0022",
+          "comment": "Accepted with a stable search container locator.",
+          "command": "type",
+          "target": "css=#searchQuery input",
+          "targets": [
+            [
+              "css=#searchQuery input",
+              "css:finder"
+            ],
+            [
+              "id=mat-input-1",
+              ""
+            ],
+            [
+              "xpath=//input[@id='mat-input-1']",
+              ""
+            ],
+            [
+              "xpath=//app-mat-search-bar[@id='searchQuery']/mat-form-field/div/div[2]/div/input",
+              ""
+            ],
+            [
+              "xpath=//input",
+              ""
+            ],
+            [
+              "css=#mat-input-1",
+              ""
+            ]
+          ],
+          "value": "test"
+        },
+        {
+          "id": "ptk-katalon-command-0023",
+          "comment": "Accepted with a stable search container locator.",
+          "command": "sendKeys",
+          "target": "css=#searchQuery input",
+          "targets": [
+            [
+              "css=#searchQuery input",
+              "css:finder"
+            ],
+            [
+              "id=mat-input-1",
+              ""
+            ],
+            [
+              "xpath=//input[@id='mat-input-1']",
+              ""
+            ],
+            [
+              "xpath=//app-mat-search-bar[@id='searchQuery']/mat-form-field/div/div[2]/div/input",
+              ""
+            ],
+            [
+              "xpath=//input",
+              ""
+            ],
+            [
+              "css=#mat-input-1",
+              ""
+            ]
+          ],
+          "value": "${KEY_ENTER}"
+        }
+      ]
+    }
+  ],
+  "suites": [
+    {
+      "id": "ptk-katalon-suite-juice-shop",
+      "name": "Juice Shop visible journey",
+      "persistSession": false,
+      "parallel": false,
+      "timeout": 300,
+      "tests": [
+        "ptk-katalon-test-juice-shop"
+      ]
+    }
+  ],
+  "urls": [
+    "http://localhost:3001"
+  ],
+  "plugins": []
+}

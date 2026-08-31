@@ -1,6 +1,8 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 
 const { evaluateRequiredFindings } = require('./framework-smoke-helpers.cjs');
@@ -43,4 +45,15 @@ test('required finding gate rejects evidence without authoritative engine identi
 
   assert.equal(gate.ok, false);
   assert.equal(gate.requirements[0].count, 0);
+});
+
+test('Playwright smoke honors the explicit full-extension activation contract', () => {
+  const source = fs.readFileSync(
+    path.resolve(__dirname, '../frameworks/playwright/smoke/juice_shop_scan.mjs'),
+    'utf8'
+  );
+
+  assert.match(source, /activateBridge:\s*toBoolean\(env\('PTK_BRIDGE_ACTIVATE'\), false\)/);
+  assert.match(source, /activate:\s*config\.activateBridge/);
+  assert.match(source, /activationReason:\s*'ptk_playwright_smoke'/);
 });

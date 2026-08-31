@@ -17,6 +17,13 @@ function writeLine(stream, line) {
   stream.write(`${line}\n`);
 }
 
+function printExecutionPlanNotices(context, plan) {
+  const { executionNoticeLines } = require('../core/executionPlan.cjs');
+  for (const line of executionNoticeLines(plan)) {
+    writeLine(context.io.stderr, line);
+  }
+}
+
 function printBlock(stream, lines) {
   for (const line of lines) {
     writeLine(stream, line);
@@ -199,6 +206,7 @@ module.exports = {
   EXIT_UNIMPLEMENTED,
   EXIT_USAGE,
   printBlock,
+  printExecutionPlanNotices,
   printRunResult,
   printResult,
   unimplemented,

@@ -1,0 +1,62 @@
+{
+  "about": "PTK Agent local Juice Shop macro smoke",
+  "zestVersion": "0.3",
+  "title": "Juice Shop login",
+  "description": "Uses the documented local PTK test account and a runtime password reference.",
+  "prefix": "",
+  "type": "StandAlone",
+  "parameters": {
+    "tokenStart": "{{",
+    "tokenEnd": "}}",
+    "tokens": {},
+    "elementType": "ZestVariables"
+  },
+  "statements": [
+    {
+      "browserType": "chrome-headless",
+      "capabilities": "",
+      "headless": true,
+      "url": "http://localhost:3001/#/login",
+      "windowHandle": "windowHandle1",
+      "index": 1,
+      "enabled": true,
+      "elementType": "ZestClientLaunch"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "email",
+      "waitForMsec": 5000,
+      "value": "ptk@test.com",
+      "index": 2,
+      "enabled": true,
+      "elementType": "ZestClientElementSendKeys"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "password",
+      "waitForMsec": 5000,
+      "value": "${PTK_SECRET:PASSWORD}",
+      "index": 3,
+      "enabled": true,
+      "elementType": "ZestClientElementSendKeys"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "cssSelector",
+      "element": "#loginButton",
+      "waitForMsec": 5000,
+      "index": 4,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    }
+  ],
+  "authentication": [],
+  "index": 0,
+  "enabled": true,
+  "elementType": "ZestScript",
+  "options": {
+    "statementDelay": 0
+  }
+}

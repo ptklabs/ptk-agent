@@ -74,6 +74,7 @@ function readConfig() {
     loginEmail: env('PTK_LOGIN_EMAIL', env('PTK_JUICE_USERNAME', 'YOUR_USERNAME')),
     loginPassword: env('PTK_LOGIN_PASSWORD', env('PTK_JUICE_PASSWORD', 'YOUR_PASSWORD')),
     searchTerm: env('PTK_SEARCH_TERM', 'test'),
+    activateBridge: toBoolean(env('PTK_BRIDGE_ACTIVATE'), false),
     readyTimeoutMs: Number(env('PTK_READY_TIMEOUT_MS', '30000')),
     progressTimeoutMs: Number(env('PTK_PROGRESS_TIMEOUT_MS', '60000')),
     minScanSeconds: Number(env('PTK_MIN_SCAN_SECONDS', '30')),
@@ -619,7 +620,11 @@ async function main() {
 
     await page.goto(`${config.baseUrl}/`, { waitUntil: 'domcontentloaded' });
     const ptk = createPtkBridge(page);
-    const bridgeInfo = await ptk.waitReady({ timeoutMs: config.readyTimeoutMs });
+    const bridgeInfo = await ptk.waitReady({
+      timeoutMs: config.readyTimeoutMs,
+      activate: config.activateBridge,
+      activationReason: 'ptk_playwright_smoke'
+    });
     console.log('PTK bridge ready:', {
       version: bridgeInfo.version,
       capabilities: bridgeInfo.capabilities

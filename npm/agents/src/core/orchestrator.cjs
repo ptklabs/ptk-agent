@@ -17,14 +17,24 @@ function determineRequestedMode(options = {}, config = {}) {
   if (options.requestedMode) return options.requestedMode;
   if (options.openOnly) return 'open-only';
   if (options.dryRun) return 'dry-run';
+  if (isMacroOnlyRun(config)) return 'macro';
   if (config.agent && config.agent.enabled) return 'agent';
   if (config.scenario && config.scenario.enabled) return 'scenario';
   return 'crawl';
 }
 
+function isMacroOnlyRun(config = {}) {
+  return Boolean(
+    config.scenario
+    && config.scenario.enabled
+    && config.scenario.file
+    && config.scenario.inputType === 'macro'
+  );
+}
+
 function assertSupportedSkeleton(config = {}, options = {}, handlers = {}) {
   if (options.dryRun) return;
-  if (config.agent && config.agent.enabled && typeof handlers.agent !== 'function') {
+  if (!isMacroOnlyRun(config) && config.agent && config.agent.enabled && typeof handlers.agent !== 'function') {
     throw new UnsupportedExecutionError('agent execution requires an agent handler', {
       requestedMode: 'agent'
     });
@@ -82,6 +92,7 @@ async function orchestrateRun(context = {}) {
   };
 
   if (options.openOnly) return effectiveHandlers.openOnly(context);
+  if (isMacroOnlyRun(config)) return effectiveHandlers.scenario(context);
   if (config.agent && config.agent.enabled) return effectiveHandlers.agent(context);
   if (config.scenario && config.scenario.enabled) return effectiveHandlers.scenario(context);
   return effectiveHandlers.crawl(context);
@@ -909,7 +920,8 @@ async function collectPtkEvidence(page, {
   lifecycleStart = null,
   preferStatusPage = false,
   ignoreSessionId = false,
-  preDrain = undefined
+  preDrain = undefined,
+  redactValues = []
 } = {}) {
   if (!page || !config.ptk || config.ptk.enabled === false) return null;
   let stopped = null;
@@ -1154,16 +1166,19 @@ async function collectPtkEvidence(page, {
         reason: exported.bridge && exported.bridge.reason || exported.reason || exported.invocation && exported.invocation.reason || 'not_available'
       };
     }
-    const adapted = adaptPtkEvidence(exported.evidence);
-    const findings = summarizeFindings(exported.evidence);
-    applyFindingsCountToTelemetry(telemetry, exported.evidence);
+    const safeEvidence = redactValues.length
+      ? require('../evidence/ptkEvidenceAdapter.cjs').redactPtkSecretsWithValues(exported.evidence, redactValues)
+      : exported.evidence;
+    const adapted = adaptPtkEvidence(safeEvidence);
+    const findings = summarizeFindings(safeEvidence);
+    applyFindingsCountToTelemetry(telemetry, safeEvidence);
     return {
       available: true,
       exported: Boolean(exported.exported),
       collected: Boolean(exported.collected),
       bridge: exported.bridge,
       lifecycle,
-      validity: exported.validity || exported.evidence.validity || {
+      validity: exported.validity || safeEvidence.validity || {
         valid: true,
         status: 'valid',
         hasPtkBridge: true,
@@ -1173,7 +1188,7 @@ async function collectPtkEvidence(page, {
       },
       counts: adapted.counts,
       findings,
-      evidence: exported.evidence
+      evidence: safeEvidence
     };
   } catch (err) {
     if (logger && typeof logger.debug === 'function') logger.debug('PTK evidence export failed', err.message);
@@ -2293,6 +2308,18 @@ async function scenarioHandler(context = {}) {
     ? { page: context.page, close: async () => {} }
     : context.session || await openBrowserTarget(context);
   try {
+    let preparedMacro = null;
+    if (context.config.scenario
+        && context.config.scenario.file
+        && context.config.scenario.inputType === 'macro') {
+      const macroPath = resolveScenarioFile(context.config, context.options || {});
+      preparedMacro = await require('../scenario/macroLoader.cjs').loadMacroScenario(macroPath, {
+        config: context.config,
+        format: context.config.scenario.format || 'auto',
+        cwd: context.options && context.options.cwd || process.cwd(),
+        env: context.options && context.options.env || process.env
+      });
+    }
     const ptkStart = context.skipPtkCollection
       ? context.ptkLifecycleStart || null
       : context.ptkLifecycleStart || await beginPtkScan(session && session.page, {
@@ -2305,10 +2332,11 @@ async function scenarioHandler(context = {}) {
       const crawl = await crawlHandler({ ...context, session, ptkLifecycleStart: ptkStart });
       return attachSessionIfRequested({ ...crawl, scenario: { ok: false, reason: 'scenario_file_missing' } }, session, context.keepSession);
     }
-    const { loadScenarioFile } = require('../scenario/scenarioCompiler.cjs');
     const { runScenario } = require('../scenario/scenarioWorker.cjs');
     const { createFormAttemptLedger } = require('../crawl/formWorker.cjs');
-    const compiled = loadScenarioFile(resolveScenarioFile(context.config, context.options || {}));
+    const scenarioPath = resolveScenarioFile(context.config, context.options || {});
+    const compiled = preparedMacro
+      || require('../scenario/scenarioCompiler.cjs').loadScenarioFile(scenarioPath);
     const formAttemptLedger = createFormAttemptLedger();
     const scenario = await runScenario({
       scenario: compiled.scenario,
@@ -2320,10 +2348,36 @@ async function scenarioHandler(context = {}) {
         page: session && session.page,
         profile: context.config.profile || {},
         formAttemptLedger,
+        macroRuntime: compiled.macroRuntime || null,
         scenarioRouteHints: compiled.scenario.metadata && compiled.scenario.metadata.routeHints || []
       },
       stopOnFailure: false
     });
+    if (isMacroOnlyRun(context.config)) {
+      const coverage = createEmptyCoverage(context.telemetry && context.telemetry.toSummary ? context.telemetry.toSummary() : {});
+      coverage.scenario = summarizeScenarioStatus(scenario);
+      coverage.authPreflight = buildAuthPreflightArtifact(coverage.scenario, context.config);
+      coverage.execution = {
+        mode: 'macro-only',
+        crawlerExecuted: false,
+        agentExecuted: false
+      };
+      if (session && session.browserSummary) coverage.browser = session.browserSummary;
+      const ptk = context.skipPtkCollection ? null : await collectPtkEvidence(session && session.page, {
+        config: context.config,
+        telemetry: context.telemetry,
+        logger: context.logger,
+        lifecycleStart: ptkStart,
+        redactValues: macroArtifactSensitiveValues(compiled.macroRuntime)
+      });
+      if (ptk) coverage.ptk = ptk;
+      return attachSessionIfRequested({
+        status: scenario.ok ? 'completed' : 'scenario_failed',
+        routes: [],
+        coverage,
+        scenario
+      }, session, context.keepSession);
+    }
     if (!scenario.ok && context.config.scenario.continueOnFailure !== true) {
       const coverage = createEmptyCoverage(context.telemetry && context.telemetry.toSummary ? context.telemetry.toSummary() : {});
       coverage.scenario = summarizeScenarioStatus(scenario);
@@ -2390,6 +2444,31 @@ async function currentPageUrl(page) {
   } catch (_) {
     return null;
   }
+}
+
+function macroArtifactSensitiveValues(macroRuntime = null) {
+  const steps = macroRuntime && macroRuntime.flow && Array.isArray(macroRuntime.flow.steps)
+    ? macroRuntime.flow.steps
+    : [];
+  const sensitiveField = /(?:password|passwd|pwd|passw|secret|token|api[_-]?key|authorization|auth[_-]?header|credential|cookie|session|jwt|bearer)/i;
+  const values = Object.values(macroRuntime && macroRuntime.secrets || {})
+    .filter(value => typeof value === 'string' && value.length > 0);
+  for (const step of steps) {
+    if (!step || step.data && step.data.kind !== 'literal') continue;
+    const locatorIdentity = (step.locators || [])
+      .map(locator => `${locator && locator.type || ''} ${locator && locator.value || ''}`)
+      .join(' ');
+    const sourceIdentity = step.source && typeof step.source === 'object'
+      ? Object.entries(step.source)
+        .filter(([key]) => !/value|text|data/i.test(key))
+        .map(([key, value]) => `${key} ${typeof value === 'string' ? value : ''}`)
+        .join(' ')
+      : '';
+    if (!sensitiveField.test(`${locatorIdentity} ${sourceIdentity}`)) continue;
+    const value = step.data && step.data.value;
+    if (typeof value === 'string' && value.length > 0) values.push(value);
+  }
+  return Array.from(new Set(values));
 }
 
 function summarizeScenarioStatus(scenario = {}) {
@@ -3670,6 +3749,7 @@ function resolveScenarioFile(config = {}, options = {}) {
 
 function resolveScenarioRouteHints(config = {}, options = {}) {
   if (!config.scenario || !config.scenario.enabled || !config.scenario.file) return [];
+  if (config.scenario.inputType === 'macro') return [];
   try {
     const { loadScenarioFile } = require('../scenario/scenarioCompiler.cjs');
     const compiled = loadScenarioFile(resolveScenarioFile(config, options));
@@ -3979,6 +4059,8 @@ module.exports = {
   createDefaultHandlers,
   createOrchestrator,
   determineRequestedMode,
+  isMacroOnlyRun,
+  macroArtifactSensitiveValues,
   resolveRouteHint,
   resolveScenarioRouteHints,
   hasScenarioAuthIntent,

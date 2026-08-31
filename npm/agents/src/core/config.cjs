@@ -18,6 +18,7 @@ const ENCODED_PRIVATE_VALUE_PATTERN = /\b[A-Z0-9._%+-]+%40[A-Z0-9.-]+\.[A-Z]{2,}
 const PRIVATE_KEY_PATTERN = /^(?:username|email|login|user)$/i;
 const PRIVATE_QUERY_KEY_PATTERN = /^(?:username|email|login|user)$/i;
 const SAFE_SENSITIVE_BOOLEAN_KEY_PATTERN = /^(?:sessionLost)$/i;
+const MACRO_IMPORT_FORMATS = new Set(['auto', 'ptk-flow', 'json', 'xml', 'zest', 'side', 'chrome-recorder']);
 
 const DEFAULT_CONFIG = Object.freeze({
   version: CONFIG_VERSION,
@@ -76,6 +77,8 @@ const DEFAULT_CONFIG = Object.freeze({
   scenario: {
     enabled: false,
     file: null,
+    inputType: 'scenario',
+    format: 'auto',
     continueOnFailure: false
   },
   agent: {
@@ -178,7 +181,7 @@ const NESTED_KEYS = Object.freeze({
   'crawler.codeSignals': ['enabled', 'mode', 'maxScripts', 'maxScriptBytes', 'maxTotalBytes', 'maxSignalMs', 'seedRoutes', 'includeSourceMaps', 'includeExternalScripts'],
   'crawler.surfaceExplorer': ['enabled', 'maxExpansionsPerRoute', 'maxNestedExpansions', 'maxMenuActionsPerSurface', 'maxRouteChangingMenuActions', 'reopenSurfaceBetweenMenuActions', 'maxExpansionMs', 'maxSurfaceMs'],
   browserProbe: ['enabled', 'maxNodes', 'maxControls', 'maxRoutes', 'maxTextChars', 'observeMutations', 'redactValues'],
-  scenario: ['enabled', 'file', 'continueOnFailure'],
+  scenario: ['enabled', 'file', 'inputType', 'format', 'continueOnFailure'],
   agent: ['enabled', 'mode', 'provider', 'model', 'maxTurns', 'maxStepsPerTurn', 'fallback', 'maxProviderMs', 'riskMode', 'allowBusinessMutations', 'allowDestructiveActions', 'requireSuccess'],
   profile: ['file', 'activePersonaId', 'username', 'password', 'includeSecrets', 'credentials', 'values', 'personas', 'addresses', 'paymentMethods', 'businessEntities', 'searchTerms', 'uploadFixtures', 'workflowHints'],
   memory: ['mode', 'storageDir', 'reset', 'staleAfterDays', 'minConfidence', 'maxSeedRoutes'],
@@ -537,6 +540,12 @@ function validateConfig(config) {
   if (isPlainObject(config.scenario)) {
     config.scenario.enabled = normalizeBoolean(config.scenario.enabled, 'scenario.enabled', errors);
     config.scenario.file = normalizeNullableString(config.scenario.file, 'scenario.file', errors);
+    if (!['scenario', 'macro'].includes(config.scenario.inputType)) {
+      errors.push('scenario.inputType must be one of: scenario, macro');
+    }
+    if (typeof config.scenario.format !== 'string' || !MACRO_IMPORT_FORMATS.has(config.scenario.format.trim())) {
+      errors.push(`scenario.format must be one of: ${Array.from(MACRO_IMPORT_FORMATS).join(', ')}`);
+    }
     config.scenario.continueOnFailure = normalizeBoolean(config.scenario.continueOnFailure, 'scenario.continueOnFailure', errors);
     if (config.scenario.enabled && config.scenario.file === null) {
       errors.push('scenario.file must be set when scenario.enabled is true');
@@ -905,9 +914,11 @@ function configOverridesFromCli(args = {}) {
   set(['crawler', 'waitStrategy'], args.waitStrategy);
   set(['crawler', 'routeHintsFile'], args.routeHintsFile || args.routeHints);
   set(['crawler', 'salvageTimedOutRoutes'], args.salvageTimedOutRoutes);
-  const scenarioFile = args.scenarioFile || args.scenario;
+  const scenarioFile = args.macroFile || args.scenarioFile || args.scenario;
   set(['scenario', 'enabled'], args.scenarioEnabled !== undefined ? args.scenarioEnabled : (scenarioFile ? true : undefined));
   set(['scenario', 'file'], scenarioFile);
+  set(['scenario', 'inputType'], args.macroFile ? 'macro' : args.scenarioInputType);
+  set(['scenario', 'format'], args.macroFormat);
   set(['scenario', 'continueOnFailure'], args.scenarioContinueOnFailure);
   set(['agent', 'enabled'], args.agentEnabled !== undefined ? args.agentEnabled : (args.agentMode && args.agentMode !== 'off' ? true : undefined));
   set(['agent', 'mode'], args.agentMode);

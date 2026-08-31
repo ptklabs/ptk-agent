@@ -191,10 +191,12 @@
     "scenario": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["enabled", "file", "continueOnFailure"],
+      "required": ["enabled", "file", "inputType", "format", "continueOnFailure"],
       "properties": {
         "enabled": { "type": "boolean" },
         "file": { "type": ["string", "null"], "minLength": 1 },
+        "inputType": { "type": "string", "enum": ["scenario", "macro"], "default": "scenario" },
+        "format": { "type": "string", "enum": ["auto", "ptk-flow", "json", "xml", "zest", "side", "chrome-recorder"], "default": "auto" },
         "continueOnFailure": { "type": "boolean", "default": false }
       }
     },

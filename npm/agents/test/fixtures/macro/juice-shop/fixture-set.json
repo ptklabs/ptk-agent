@@ -1,0 +1,74 @@
+{
+  "schema": "ptk-macro-fixture-set/v1",
+  "journey": "journey.json",
+  "releaseScanConfig": "release-scan.config.json",
+  "sourceOfTruth": "pentestkit",
+  "requiredRecordings": [
+    {
+      "id": "ptk-flow",
+      "format": "ptk-flow",
+      "producer": "OWASP PTK Recorder",
+      "file": "recordings/ptk-flow.json",
+      "status": "accepted",
+      "sha256": "2f76ad60a7df2b741b9cfcb397f6472aa0165799d53566f30bcd661f88964a2a"
+    },
+    {
+      "id": "ptk-xml",
+      "format": "xml",
+      "producer": "OWASP PTK Recorder",
+      "file": "recordings/ptk-xml.rec",
+      "status": "accepted",
+      "sha256": "a589a30014a7a349507a31b3b5913154e2515506529207383dbf95f61945a315"
+    },
+    {
+      "id": "zap-zest",
+      "format": "zest",
+      "producer": "ZAP by Checkmarx Recorder",
+      "file": "recordings/zap-zest.zst",
+      "status": "accepted",
+      "sha256": "26ab3acef275607b15d1a7818d950380760f8f6cd1836b01d35a3469ada57292"
+    },
+    {
+      "id": "chrome-recorder",
+      "format": "chrome-recorder",
+      "producer": "Chrome DevTools Recorder",
+      "file": "recordings/chrome-recorder.json",
+      "status": "accepted",
+      "sha256": "103a05852611cc07af4ddf8088fd3cc0cbb687877910a309a499205ceaf36cd4"
+    },
+    {
+      "id": "katalon",
+      "format": "xml",
+      "producer": "Katalon Recorder command model",
+      "file": "recordings/katalon.xml",
+      "status": "accepted",
+      "sha256": "43447318d6ac2bbb82ef4d32ac7a4aeb699c1436b2d9b0d647224b8cf9b056cd"
+    },
+    {
+      "id": "katalon-selenium",
+      "format": "side",
+      "producer": "Katalon-derived Selenium IDE project",
+      "file": "recordings/katalon-selenium.side",
+      "status": "accepted",
+      "sha256": "c4513ace3770c637bc67506ed88fa09f5a966ae438e0fa2dbac8a3fdc0b357ec"
+    }
+  ],
+  "provenanceArtifacts": [
+    {
+      "id": "katalon-native",
+      "format": "krecorder",
+      "producer": "Katalon Recorder 7.1.0",
+      "file": "recordings/katalon.krecorder",
+      "status": "provenance-only",
+      "sha256": "e40dcf1dcedb3652e208efdcd56ed3febfe476d7d391a29076f718d58b3c8493"
+    }
+  ],
+  "deferredRecordings": [
+    {
+      "id": "selenium-ide-firefox",
+      "format": "side",
+      "producer": "Selenium IDE for Firefox",
+      "reason": "The Selenium IDE application is unavailable on the current macOS test host; a Firefox-native recording will be added later."
+    }
+  ]
+}

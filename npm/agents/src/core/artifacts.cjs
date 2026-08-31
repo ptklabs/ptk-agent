@@ -18,6 +18,7 @@ const ARTIFACT_FILENAMES = Object.freeze({
   ptkFindingsCount: 'ptk-findings-count.json',
   browserSummary: 'browser-summary.json',
   compatibilitySummary: 'compatibility-summary.json',
+  executionPlan: 'execution-plan.json',
   engineSummary: 'engine-summary.json',
   moduleResolution: 'module-resolution.json',
   siteMemory: 'site-memory.json',

@@ -1,0 +1,959 @@
+{
+  "schema": "ptk-flow/v1",
+  "metadata": {
+    "name": "PTK localhost",
+    "sourceFormat": "recording"
+  },
+  "startUrl": "http://localhost:3001/",
+  "variables": [],
+  "steps": [
+    {
+      "id": "step-0001",
+      "type": "navigate",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 1,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Navigate",
+        "index": 0
+      },
+      "url": "http://localhost:3001/"
+    },
+    {
+      "id": "step-0002",
+      "type": "delay",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 512,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Delay",
+        "index": 1
+      }
+    },
+    {
+      "id": "step-0003",
+      "type": "click",
+      "enabled": true,
+      "optional": true,
+      "durationMs": 30,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "[aria-label=\"Close Welcome Banner\"]"
+        },
+        {
+          "type": "css",
+          "value": "button[aria-label=\"Close Welcome Banner\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > div:nth-of-type(4) > div:nth-of-type(3) > div > mat-dialog-container > div > div > app-welcome-banner > div:nth-of-type(2) > button:nth-of-type(2)"
+        },
+        {
+          "type": "xpath",
+          "value": "//button[@aria-label=\"Close Welcome Banner\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/div[3]/div[2]/div/mat-dialog-container/div/div/app-welcome-banner/div[1]/button[1]"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 2
+      }
+    },
+    {
+      "id": "step-0004",
+      "type": "click",
+      "enabled": true,
+      "optional": true,
+      "durationMs": 41,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "[aria-label=\"dismiss cookie message\"]"
+        },
+        {
+          "type": "css",
+          "value": "a[aria-label=\"dismiss cookie message\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > div > div > a"
+        },
+        {
+          "type": "xpath",
+          "value": "//a[@aria-label=\"dismiss cookie message\"]"
+        },
+        {
+          "type": "linkText",
+          "value": "Me want it!"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/div/div/a"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 3
+      }
+    },
+    {
+      "id": "step-0005",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 5055,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "id",
+          "value": "navbarAccount"
+        },
+        {
+          "type": "css",
+          "value": "[aria-label=\"Show/hide account menu\"]"
+        },
+        {
+          "type": "css",
+          "value": "button[aria-label=\"Show/hide account menu\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-navbar > mat-toolbar > mat-toolbar-row > button:nth-of-type(3)"
+        },
+        {
+          "type": "xpath",
+          "value": "//button[@aria-label=\"Show/hide account menu\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/button[2]"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 4
+      }
+    },
+    {
+      "id": "step-0006",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 139,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "id",
+          "value": "navbarLoginButton"
+        },
+        {
+          "type": "css",
+          "value": "button[aria-label=\"Go to login page\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > div:nth-of-type(4) > div:nth-of-type(2) > div > div > div > button"
+        },
+        {
+          "type": "xpath",
+          "value": "//button[@aria-label=\"Go to login page\"]"
+        },
+        {
+          "type": "css",
+          "value": "[aria-label=\"Go to login page\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/div[3]/div[1]/div/div/div/button"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 5
+      }
+    },
+    {
+      "id": "step-0007",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 19,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "id",
+          "value": "email"
+        },
+        {
+          "type": "css",
+          "value": "[aria-label=\"Text field for the login email\"]"
+        },
+        {
+          "type": "name",
+          "value": "email"
+        },
+        {
+          "type": "css",
+          "value": "input[aria-label=\"Text field for the login email\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "//input[@aria-label=\"Text field for the login email\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-login > div > mat-card > div > div > mat-form-field > div > div > div:nth-of-type(2) > input"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-login/div/mat-card/div/div/mat-form-field/div/div/div[1]/input"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 6
+      }
+    },
+    {
+      "id": "step-0008",
+      "type": "fill",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 31,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "id",
+          "value": "email"
+        },
+        {
+          "type": "css",
+          "value": "[aria-label=\"Text field for the login email\"]"
+        },
+        {
+          "type": "name",
+          "value": "email"
+        },
+        {
+          "type": "css",
+          "value": "input[aria-label=\"Text field for the login email\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "//input[@aria-label=\"Text field for the login email\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-login > div > mat-card > div > div > mat-form-field > div > div > div:nth-of-type(2) > input"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-login/div/mat-card/div/div/mat-form-field/div/div/div[1]/input"
+        }
+      ],
+      "data": {
+        "kind": "literal",
+        "value": "ptk@test.com"
+      },
+      "source": {
+        "format": "recording",
+        "command": "SetValue",
+        "index": 7
+      }
+    },
+    {
+      "id": "step-0009",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 12,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "id",
+          "value": "password"
+        },
+        {
+          "type": "css",
+          "value": "[aria-label=\"Text field for the login password\"]"
+        },
+        {
+          "type": "name",
+          "value": "password"
+        },
+        {
+          "type": "css",
+          "value": "input[aria-label=\"Text field for the login password\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-login > div > mat-card > div > div > mat-form-field:nth-of-type(2) > div > div > div:nth-of-type(2) > input"
+        },
+        {
+          "type": "xpath",
+          "value": "//input[@aria-label=\"Text field for the login password\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-login/div/mat-card/div/div/mat-form-field[1]/div/div/div[1]/input"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 8
+      }
+    },
+    {
+      "id": "step-0010",
+      "type": "fill",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 30,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "id",
+          "value": "password"
+        },
+        {
+          "type": "css",
+          "value": "[aria-label=\"Text field for the login password\"]"
+        },
+        {
+          "type": "name",
+          "value": "password"
+        },
+        {
+          "type": "css",
+          "value": "input[aria-label=\"Text field for the login password\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-login > div > mat-card > div > div > mat-form-field:nth-of-type(2) > div > div > div:nth-of-type(2) > input"
+        },
+        {
+          "type": "xpath",
+          "value": "//input[@aria-label=\"Text field for the login password\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-login/div/mat-card/div/div/mat-form-field[1]/div/div/div[1]/input"
+        }
+      ],
+      "data": {
+        "kind": "literal",
+        "value": "P@ssword"
+      },
+      "source": {
+        "format": "recording",
+        "command": "SetValue",
+        "index": 9
+      }
+    },
+    {
+      "id": "step-0011",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 242,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "id",
+          "value": "loginButton"
+        },
+        {
+          "type": "css",
+          "value": "[aria-label=\"Login\"]"
+        },
+        {
+          "type": "css",
+          "value": "button[aria-label=\"Login\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-login > div > mat-card > div > div > button"
+        },
+        {
+          "type": "xpath",
+          "value": "//button[@aria-label=\"Login\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-login/div/mat-card/div/div/button"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 10
+      }
+    },
+    {
+      "id": "step-0012",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 5040,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "id",
+          "value": "navbarAccount"
+        },
+        {
+          "type": "css",
+          "value": "[aria-label=\"Show/hide account menu\"]"
+        },
+        {
+          "type": "css",
+          "value": "button[aria-label=\"Show/hide account menu\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-navbar > mat-toolbar > mat-toolbar-row > button:nth-of-type(3)"
+        },
+        {
+          "type": "xpath",
+          "value": "//button[@aria-label=\"Show/hide account menu\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/button[2]"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 11
+      }
+    },
+    {
+      "id": "step-0013",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 709,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "button[aria-label=\"Go to user profile\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "//button[@aria-label=\"Go to user profile\"]"
+        },
+        {
+          "type": "css",
+          "value": "[aria-label=\"Go to user profile\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > div:nth-of-type(4) > div:nth-of-type(2) > div > div > div > button"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/div[3]/div[1]/div/div/div/button"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 12
+      }
+    },
+    {
+      "id": "step-0014",
+      "type": "delay",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 9912,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Delay",
+        "index": 13
+      }
+    },
+    {
+      "id": "step-0015",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 1978,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "linkText",
+          "value": "arrow_back"
+        },
+        {
+          "type": "css",
+          "value": "body > div > header > div > a"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/div/header/div/a"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 14
+      }
+    },
+    {
+      "id": "step-0016",
+      "type": "delay",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 221,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Delay",
+        "index": 15
+      }
+    },
+    {
+      "id": "step-0017",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 380,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "[aria-label=\"Add to Basket\"]"
+        },
+        {
+          "type": "css",
+          "value": "button[aria-label=\"Add to Basket\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-search-result > div > div > div:nth-of-type(2) > mat-grid-list > div > mat-grid-tile > div > mat-card > div > div:nth-of-type(2) > button"
+        },
+        {
+          "type": "xpath",
+          "value": "//button[@aria-label=\"Add to Basket\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-search-result/div/div/div[1]/mat-grid-list/div/mat-grid-tile/div/mat-card/div/div[1]/button"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 16
+      }
+    },
+    {
+      "id": "step-0018",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 399,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-search-result > div > div > div:nth-of-type(2) > mat-grid-list > div > mat-grid-tile:nth-of-type(2) > div > mat-card > div > div:nth-of-type(2) > button"
+        },
+        {
+          "type": "css",
+          "value": "[aria-label=\"Add to Basket\"]"
+        },
+        {
+          "type": "css",
+          "value": "button[aria-label=\"Add to Basket\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "//button[@aria-label=\"Add to Basket\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-search-result/div/div/div[1]/mat-grid-list/div/mat-grid-tile[1]/div/mat-card/div/div[1]/button"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 17
+      }
+    },
+    {
+      "id": "step-0019",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 5161,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "[aria-label=\"Show the shopping cart\"]"
+        },
+        {
+          "type": "css",
+          "value": "button[aria-label=\"Show the shopping cart\"]"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-navbar > mat-toolbar > mat-toolbar-row > button:nth-of-type(4)"
+        },
+        {
+          "type": "xpath",
+          "value": "//button[@aria-label=\"Show the shopping cart\"]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/button[3]"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 18
+      }
+    },
+    {
+      "id": "step-0020",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 6049,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-basket > mat-card > div > app-purchase-basket > mat-table > mat-row > mat-cell:nth-of-type(5) > button"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-basket/mat-card/div/app-purchase-basket/mat-table/mat-row/mat-cell[4]/button"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 19
+      }
+    },
+    {
+      "id": "step-0021",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 5031,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "app-mat-search-bar[aria-label=\"Click to search\"] > span > mat-icon:nth-of-type(2)"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-navbar > mat-toolbar > mat-toolbar-row > app-mat-search-bar > span > mat-icon:nth-of-type(2)"
+        },
+        {
+          "type": "xpath",
+          "value": "//app-mat-search-bar[@aria-label=\"Click to search\"]/span/mat-icon[1]"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/app-mat-search-bar/span/mat-icon[1]"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 20
+      }
+    },
+    {
+      "id": "step-0022",
+      "type": "click",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 13,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "app-mat-search-bar[aria-label=\"Click to search\"] > mat-form-field > div > div:nth-of-type(2) > div > input"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-navbar > mat-toolbar > mat-toolbar-row > app-mat-search-bar > mat-form-field > div > div:nth-of-type(2) > div > input"
+        },
+        {
+          "type": "xpath",
+          "value": "//app-mat-search-bar[@aria-label=\"Click to search\"]/mat-form-field/div/div[1]/div/input"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/app-mat-search-bar/mat-form-field/div/div[1]/div/input"
+        }
+      ],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "Click",
+        "index": 21
+      }
+    },
+    {
+      "id": "step-0023",
+      "type": "fill",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 8,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "app-mat-search-bar[aria-label=\"Click to search\"] > mat-form-field > div > div:nth-of-type(2) > div > input"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-navbar > mat-toolbar > mat-toolbar-row > app-mat-search-bar > mat-form-field > div > div:nth-of-type(2) > div > input"
+        },
+        {
+          "type": "xpath",
+          "value": "//app-mat-search-bar[@aria-label=\"Click to search\"]/mat-form-field/div/div[1]/div/input"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/app-mat-search-bar/mat-form-field/div/div[1]/div/input"
+        }
+      ],
+      "data": {
+        "kind": "literal",
+        "value": "test"
+      },
+      "source": {
+        "format": "recording",
+        "command": "SetValue",
+        "index": 22
+      }
+    },
+    {
+      "id": "step-0024",
+      "type": "keyPress",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 0,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [
+        {
+          "type": "css",
+          "value": "app-mat-search-bar[aria-label=\"Click to search\"] > mat-form-field > div > div:nth-of-type(2) > div > input"
+        },
+        {
+          "type": "css",
+          "value": "body > app-root > mat-sidenav-container > mat-sidenav-content > app-navbar > mat-toolbar > mat-toolbar-row > app-mat-search-bar > mat-form-field > div > div:nth-of-type(2) > div > input"
+        },
+        {
+          "type": "xpath",
+          "value": "//app-mat-search-bar[@aria-label=\"Click to search\"]/mat-form-field/div/div[1]/div/input"
+        },
+        {
+          "type": "xpath",
+          "value": "/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/app-mat-search-bar/mat-form-field/div/div[1]/div/input"
+        }
+      ],
+      "data": {
+        "kind": "literal",
+        "value": "${KEY_ENTER}"
+      },
+      "source": {
+        "format": "recording",
+        "command": "SendKeys",
+        "index": 23
+      }
+    },
+    {
+      "id": "step-0025",
+      "type": "delay",
+      "enabled": true,
+      "optional": false,
+      "durationMs": 3000,
+      "timeoutMs": 0,
+      "window": {
+        "index": 0,
+        "handle": ""
+      },
+      "frameChain": [],
+      "locators": [],
+      "data": null,
+      "source": {
+        "format": "recording",
+        "command": "generated-final-delay"
+      }
+    }
+  ]
+}

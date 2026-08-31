@@ -11,6 +11,8 @@ The package provides:
 - Playwright, Puppeteer, Selenium, and Cypress integrations;
 - helpers for Browserbase, Browserless, BrowserStack, Hyperbrowser, Steel, and TestMu;
 - Chromium and Firefox PTK Auto browser artifacts.
+- structured macro import for scan journeys recorded by PTK, ZAP Zest,
+  Selenium IDE, or Chrome Recorder.
 
 The source code and issue tracker are at [ptklabs/ptk-agent](https://github.com/ptklabs/ptk-agent). The package is licensed under [AGPL-3.0-only](https://github.com/ptklabs/ptk-agent/blob/main/LICENSE.txt).
 
@@ -20,6 +22,10 @@ The source code and issue tracker are at [ptklabs/ptk-agent](https://github.com/
 npm install -D pentestkit
 npx playwright install chromium
 ```
+
+The base installation does not install Puppeteer. If you choose the optional
+Puppeteer integration, explicitly add either `puppeteer` or `puppeteer-core` as
+described in the [framework guide](frameworks.md#puppeteer-experimental).
 
 Verify that PTK Auto can be resolved:
 
@@ -78,6 +84,51 @@ npx ptk-agent-mcp-server --stdio
 ```
 
 See the [CLI reference](cli.md) for all flags and subcommands.
+
+## Choose The Browser Journey
+
+PTK always runs the selected security engines around a browser journey:
+
+- a normal scan uses deterministic crawling;
+- a scenario runs first and is followed by deterministic crawling;
+- scenario plus Agent mode adds Agent/LLM exploration after that baseline;
+- a recorded macro is exclusive and is the only browser journey.
+
+When a command includes `--macro-file` together with `--scenario` and/or an
+enabled `--agent-mode`, PTK prints a clear pre-browser notice, skips the
+conflicting journey phases, and continues with macro-only execution. “Macro
+only” does not disable DAST, IAST, SAST, or SCA; it disables additional journey
+drivers. The effective decision is written to `execution-plan.json`. See the
+complete [execution combination matrix](scenarios.md#choose-one-journey-model).
+
+## Macro-driven scans
+
+Use an existing browser journey while the selected PTK engines are active:
+
+```bash
+npx ptk-scan https://your-authorised-target.example \
+  --macro-file ./login.zst \
+  --macro-format auto \
+  --engine DAST,IAST,SAST,SCA \
+  --require-ptk-bridge \
+  --require-ptk-findings-export
+```
+
+PTK Agent accepts PTK Flow JSON, XML, ZAP Zest, Selenium IDE, and Chrome
+Recorder input. It validates the macro and exact target origin before scan
+activation, starts PTK before the first replay action, and keeps runtime
+secrets out of serialized results. It does not continue into crawler or
+Agent/LLM exploration. Zest visibility and relative element-scroll statements
+retain their distinct behavior, including scroll-triggered lazy content. See
+[scenarios](scenarios.md#recorded-macro-scans).
+
+Literal passwords and tokens in an imported file are replayed as written. For
+an explicit `${PTK_SECRET:PASSWORD}` reference, set
+`PTK_MACRO_SECRET_PASSWORD` in the `ptk-scan` process environment; a
+`${ACCOUNT_ID}` variable reads `PTK_MACRO_VAR_ACCOUNT_ID`. These macro values
+are separate from the persona `--password` and `--password-env` options. The
+full mapping, generated-code naming, and CI example are in the
+[recorded-macro contract](scenarios.md#recorded-macro-scans).
 
 ## Authenticated Scans
 

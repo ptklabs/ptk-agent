@@ -168,7 +168,7 @@ function rowsFor(options) {
     },
     {
       framework: "selenium",
-      browser: options.browser || process.env.PTK_SELENIUM_BASELINE_BROWSER || "chrome",
+      browser: options.browser || process.env.PTK_SELENIUM_BASELINE_BROWSER || "chrome-for-testing",
       optional: false,
     },
     {

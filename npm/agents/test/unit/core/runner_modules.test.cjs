@@ -45,6 +45,61 @@ test('runner resolves modules during normal run setup and writes M3 artifacts', 
   assert.equal(engineSummary.modules.ok, true);
 });
 
+test('runner resolves and artifacts macro precedence before browser execution', async () => {
+  const outputDir = tmpDir('ptk-agent-runner-execution-plan-');
+  const observedPlans = [];
+  const result = await runPtkAgent({
+    url: 'http://app.test',
+    scenario: 'scenario.md',
+    macroFile: 'journey.zst',
+    agentMode: 'provider',
+    outputDir,
+    dryRun: true,
+    onExecutionPlan: plan => observedPlans.push(plan),
+    throwOnError: false
+  });
+
+  assert.equal(result.ok, true);
+  assert.equal(observedPlans.length, 1);
+  assert.equal(result.executionPlan.effective.journey, 'macro');
+  assert.equal(result.executionPlan.effective.agentExecuted, false);
+  assert.ok(result.artifacts.executionPlan);
+  const artifact = readJson(result.artifacts.executionPlan);
+  assert.deepEqual(artifact.notices.map(notice => notice.code), [
+    'macro_precedence_scenario_skipped',
+    'macro_precedence_agent_skipped'
+  ]);
+  assert.equal(readJson(result.artifacts.resolvedConfig)._resolved.executionPlan.effective.journey, 'macro');
+});
+
+test('runner reports journey precedence before orchestration can launch a browser', async () => {
+  const order = [];
+  const result = await runPtkAgent({
+    url: 'http://app.test',
+    scenario: 'scenario.md',
+    macroFile: 'journey.zst',
+    agentMode: 'provider',
+    writeArtifacts: false,
+    onExecutionPlan: plan => {
+      assert.equal(plan.effective.journey, 'macro');
+      order.push('notice');
+    },
+    orchestrator: {
+      orchestrate: async () => {
+        order.push('orchestrator');
+        return {
+          status: 'completed',
+          coverage: { routes: [], endpoints: [], actions: [], forms: [] }
+        };
+      }
+    },
+    throwOnError: false
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(order, ['notice', 'orchestrator']);
+});
+
 test('runner fails clearly when Pro modules are requested without download support', async () => {
   const outputDir = tmpDir('ptk-agent-runner-pro-fail-');
   const result = await runPtkAgent({

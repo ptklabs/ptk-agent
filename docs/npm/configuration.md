@@ -57,7 +57,9 @@ export PTK_SCAN_PASSWORD='change-me'
   },
   "scenario": {
     "enabled": true,
-    "file": "ptk-scenario.md"
+    "file": "ptk-scenario.md",
+    "inputType": "scenario",
+    "format": "auto"
   },
   "profile": {
     "includeSecrets": false
@@ -95,6 +97,28 @@ npx ptk-scan --config ptk.config.json \
 
 `--include-secrets` allows the local browser run to use those environment values while artifacts and provider-visible prompts remain redacted. Credential values alone do not log in. They provide values for scenario/auth/form steps. Use a scenario when the scan must authenticate.
 
+## Journey Configuration And Precedence
+
+The `scenario` section represents one journey input. Set `inputType` to
+`scenario` for Markdown/JSON guidance or to `macro` for recorded macro replay;
+one config cannot represent both at the same time.
+
+| Configuration | Execution order |
+| --- | --- |
+| No scenario and Agent disabled | Crawler. |
+| `scenario.inputType: "scenario"` | Scenario → crawler. |
+| Agent enabled without a scenario | Crawler baseline → Agent/LLM. |
+| Scenario and Agent enabled | Scenario → crawler baseline → Agent/LLM. |
+| `scenario.inputType: "macro"` | Macro only, even if Agent settings are also enabled. |
+
+When macro input is combined with a scenario override or enabled Agent mode,
+macro precedence means those additional journey phases do not execute. PTK
+prints a non-failing notice before browser launch, continues with macro-only
+execution, and writes the requested/effective decision to
+`execution-plan.json`. Keep `scenario.file` and `scenario.inputType` aligned so
+the selected file is parsed in the intended format.
+The full CLI matrix is in [scenario-guided scans](scenarios.md#choose-one-journey-model).
+
 ## Common Sections
 
 | Section | Purpose |
@@ -102,8 +126,8 @@ npx ptk-scan --config ptk.config.json \
 | `target` | Base URL and scan scope. |
 | `crawler` | Crawl budgets, route hints, form policy, code-signal route discovery, and surface exploration. |
 | `browserProbe` | Page model and DOM observation limits. |
-| `scenario` | Markdown or JSON workflow file. |
-| `agent` | Optional mock/provider agent settings. |
+| `scenario` | One Markdown/JSON scenario or one structured browser macro replayed after PTK engines start. |
+| `agent` | Optional mock/provider expansion after a crawler or scenario baseline; it is not executed in macro mode. |
 | `profile` | Credentials, personas, form values, and workflow data. |
 | `memory` | Optional site-memory reuse. |
 | `engines` | Enables DAST, IAST, SAST, and SCA. |

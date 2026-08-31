@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const { camelizeOptions, parseArgs, requireOption, UsageError } = require('../args.cjs');
 const { invokeRuntime, loadRuntimeModule } = require('../runtime-loader.cjs');
-const { EXIT_INPUT, EXIT_OK, EXIT_SOFTWARE, printRunResult, unimplemented, writeLine } = require('../status.cjs');
+const { EXIT_INPUT, EXIT_OK, EXIT_SOFTWARE, printExecutionPlanNotices, printRunResult, unimplemented, writeLine } = require('../status.cjs');
 
 const name = 'scan';
 const summary = 'Run a configured PTK Agent scan.';
@@ -19,6 +19,8 @@ function help(cliName) {
     '  --output-dir <path>  Artifact output directory override.',
     '  --url <url>          Target URL override.',
     '  --scenario <path>    Scenario file path.',
+    '  --macro-file <path>  Replay only this PTK Flow, XML, Zest, Selenium IDE, or Chrome Recorder journey while scans run.',
+    '  --macro-format <id>  Macro format override; default is automatic detection.',
     '  --scenario-continue-on-failure Continue crawl after scenario setup failure.',
     '  --crawl-depth <count> Max discovery depth. Default is 5.',
     '  --route-hints-file <path> JSON route/API surface hints to seed deterministic crawling.',
@@ -58,6 +60,10 @@ function help(cliName) {
     '  --aggressive         Allow business-tier agent mutations only.',
     '  --allow-destructive-actions Allow destructive-tier agent actions.',
     '  --require-agent-success Fail scan if agent execution fails.',
+    '',
+    'Journey order:',
+    '  scenario -> crawler; scenario + Agent -> crawler baseline -> Agent expansion.',
+    '  macro -> macro only; conflicting scenario/Agent inputs are skipped with a pre-browser notice.',
     '  --dry-run            Resolve config and write dry-run artifacts.',
     '  --quiet              Reduce runtime logging.',
     '  --verbose            Print full JSON result instead of concise CLI summary.',
@@ -69,7 +75,7 @@ function help(cliName) {
 async function run(argv, context) {
   const { options, positionals } = parseArgs(argv, {
     booleans: ['help', 'dry-run', 'quiet', 'verbose', 'include-secrets', 'scenario-continue-on-failure', 'allow-missing-ptk', 'require-ptk-bridge', 'require-ptk-findings-export', 'wait-for-ptk-complete', 'require-ptk-attack-completion', 'memory-reset', 'headed', 'headless', 'aggressive', 'allow-destructive-actions', 'require-agent-success'],
-    strings: ['config', 'output-dir', 'url', 'scenario', 'crawl-depth', 'route-hints-file', 'username', 'username-env', 'password', 'password-env', 'profile-file', 'crawl-data', 'persona', 'memory-mode', 'memory-storage', 'browser', 'chrome-binary', 'edge-binary', 'firefox-xpi', 'profile-dir', 'browser-launch-timeout-ms', 'ptk-extension-dir', 'ptk-drain-mode', 'ptk-drain-timeout-ms', 'agent-mode', 'agent-provider', 'agent-model', 'max-agent-turns', 'max-provider-ms', 'max-steps-per-turn', 'agent-risk-mode']
+    strings: ['config', 'output-dir', 'url', 'scenario', 'macro-file', 'macro-format', 'crawl-depth', 'route-hints-file', 'username', 'username-env', 'password', 'password-env', 'profile-file', 'crawl-data', 'persona', 'memory-mode', 'memory-storage', 'browser', 'chrome-binary', 'edge-binary', 'firefox-xpi', 'profile-dir', 'browser-launch-timeout-ms', 'ptk-extension-dir', 'ptk-drain-mode', 'ptk-drain-timeout-ms', 'agent-mode', 'agent-provider', 'agent-model', 'max-agent-turns', 'max-provider-ms', 'max-steps-per-turn', 'agent-risk-mode']
   });
 
   if (options.help) {
@@ -83,6 +89,10 @@ async function run(argv, context) {
     const error = new Error(`scan does not accept positional arguments: ${positionals.join(', ')}`);
     error.exitCode = EXIT_INPUT;
     throw error;
+  }
+
+  if (options['macro-format'] && !options['macro-file']) {
+    throw new UsageError('--macro-format requires --macro-file.');
   }
 
   const configPath = path.resolve(context.cwd, options.config);
@@ -106,7 +116,8 @@ async function run(argv, context) {
   const cliOptions = Object.assign(runtimeOptions, {
     config: configPath,
     cwd: context.cwd,
-    throwOnError: false
+    throwOnError: false,
+    onExecutionPlan: plan => printExecutionPlanNotices(context, plan)
   });
   if (options['crawl-depth'] !== undefined) cliOptions.crawlDepth = options['crawl-depth'];
   if (options['username-env'] !== undefined) {

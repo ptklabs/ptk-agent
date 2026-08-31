@@ -6,6 +6,7 @@ const { ARTIFACT_FILENAMES, writeJson, writeJsonl, writeStandardArtifacts } = re
 const { createLogger, createNullLogger } = require('./logger.cjs');
 const { createOrchestrator } = require('./orchestrator.cjs');
 const { buildEngineSummary, resolveModules } = require('../modules/moduleResolver.cjs');
+const { buildExecutionPlan } = require('./executionPlan.cjs');
 
 async function runPtkAgent(options = {}) {
   const logger = options.logger || (options.quiet === undefined && options.verbose === undefined
@@ -19,6 +20,14 @@ async function runPtkAgent(options = {}) {
     cwd: options.cwd || process.cwd(),
     generatedAt: options.generatedAt || null
   });
+  const executionPlan = buildExecutionPlan(config, options);
+  config._resolved = {
+    ...(config._resolved || {}),
+    executionPlan
+  };
+  if (typeof options.onExecutionPlan === 'function') {
+    options.onExecutionPlan(executionPlan);
+  }
 
   const requestedMode = options.openOnly ? 'open-only' : options.dryRun ? 'dry-run' : (options.requestedMode || options.mode || 'crawl');
   const telemetry = options.telemetry || new RunTelemetry({
@@ -79,6 +88,9 @@ async function runPtkAgent(options = {}) {
       coverage,
       events: telemetry.events
     });
+  if (artifacts) {
+    artifacts.executionPlan = writeJson(config.artifacts.outputDir, ARTIFACT_FILENAMES.executionPlan, executionPlan);
+  }
   const ptkLifecycle = createPtkLifecycle({ coverage, config, options, status: terminalStatus });
   if (artifacts && ptkLifecycle) {
     artifacts.ptkLifecycle = writeJson(config.artifacts.outputDir, ARTIFACT_FILENAMES.ptkLifecycle, ptkLifecycle);
@@ -141,6 +153,7 @@ async function runPtkAgent(options = {}) {
     telemetry: telemetry.snapshot(),
     artifacts,
     moduleResolution,
+    executionPlan,
     engineSummary,
     coverage: coverage || { routes: [], endpoints: [], actions: [], forms: [] },
     result

@@ -20,6 +20,7 @@ const {
   extractPtkFindings,
   normalizeFinding,
   redactPtkSecrets,
+  redactPtkSecretsWithValues,
   summarizeFindings,
   writeFindingsCountArtifact
 } = require('../../../src/evidence/ptkEvidenceAdapter.cjs');
@@ -107,6 +108,24 @@ test('PTK evidence adapter normalizes nested findings and redacts secrets', () =
   assert.equal(summary.bySeverity.high, 1);
   assert.equal(summary.byEngine.SAST, 1);
   assert.equal(redactPtkSecrets({ evidence: 'Authorization=Bearer abcdefghijk' }).evidence, 'Authorization=[redacted]');
+});
+
+test('PTK evidence artifact redaction removes a replay credential from payload and raw request strings', () => {
+  const credential = 'literal-password-value';
+  const input = {
+    payload: `${credential}' OR '1'='1`,
+    request: {
+      raw: `POST /login HTTP/1.1\r\n\r\nemail=user&password=${credential}`,
+      body: { text: JSON.stringify({ email: 'user@example.test', password: credential }) }
+    },
+    search: 'ordinary-search-value'
+  };
+
+  const redacted = redactPtkSecretsWithValues(input, [credential]);
+  assert.equal(JSON.stringify(redacted).includes(credential), false);
+  assert.match(redacted.payload, /^\[redacted\]/);
+  assert.equal(redacted.search, 'ordinary-search-value');
+  assert.equal(input.payload.includes(credential), true);
 });
 
 test('PTK evidence adapter recurses into scan result containers without counting containers as findings', () => {

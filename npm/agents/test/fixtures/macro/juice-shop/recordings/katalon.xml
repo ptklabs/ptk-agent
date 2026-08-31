@@ -1,0 +1,131 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<TestCase>
+  <selenese>
+    <command>open</command>
+    <target><![CDATA[http://localhost:3001/#/]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[css=button[aria-label="Close Welcome Banner"]]]></target>
+    <value><![CDATA[]]></value>
+    <ptkOptional>true</ptkOptional>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[css=a[aria-label="dismiss cookie message"]]]></target>
+    <value><![CDATA[]]></value>
+    <ptkOptional>true</ptkOptional>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[id=navbarAccount]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[id=navbarLoginButton]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[id=email]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>type</command>
+    <target><![CDATA[id=email]]></target>
+    <value><![CDATA[ptk@test.com]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[id=password]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>type</command>
+    <target><![CDATA[id=password]]></target>
+    <value><![CDATA[P@ssword]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[id=loginButton]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[id=navbarAccount]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[css=button[aria-label="Go to user profile"]]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>open</command>
+    <target><![CDATA[http://localhost:3001/profile]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[link=OWASP Juice Shop]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>open</command>
+    <target><![CDATA[http://localhost:3001/#/]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[css=button[aria-label="Close Welcome Banner"]]]></target>
+    <value><![CDATA[]]></value>
+    <ptkOptional>true</ptkOptional>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[xpath=(//button[@aria-label='Add to Basket'])[1]]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[xpath=(//button[@aria-label='Add to Basket'])[2]]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[css=button[aria-label="Show the shopping cart"]]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[css=svg[data-icon="trash-alt"]]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[css=button[aria-label="Back to homepage"]]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[css=.mat-search_icon-search]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>click</command>
+    <target><![CDATA[css=#searchQuery input]]></target>
+    <value><![CDATA[]]></value>
+  </selenese>
+  <selenese>
+    <command>type</command>
+    <target><![CDATA[css=#searchQuery input]]></target>
+    <value><![CDATA[test]]></value>
+  </selenese>
+  <selenese>
+    <command>sendKeys</command>
+    <target><![CDATA[css=#searchQuery input]]></target>
+    <value><![CDATA[${KEY_ENTER}]]></value>
+  </selenese>
+</TestCase>

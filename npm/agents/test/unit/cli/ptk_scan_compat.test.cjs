@@ -42,6 +42,8 @@ test('ptk-scan help works', () => {
   });
   assert.match(output, /Usage:/);
   assert.match(output, /ptk-scan <target-url>/);
+  assert.match(output, /\$\{PTK_SECRET:NAME\} -> PTK_MACRO_SECRET_NAME/);
+  assert.match(output, /\$\{NAME\} -> PTK_MACRO_VAR_NAME/);
 });
 
 test('positional URL maps to target.baseUrl', () => {
@@ -191,6 +193,58 @@ test('--scenario-continue-on-failure maps to scenario config', () => {
 
   assert.equal(mapped.cliOptions.scenarioContinueOnFailure, true);
   assert.ok(mapped.compatibilitySummary.cliOverrides.includes('scenario.continueOnFailure'));
+});
+
+test('--macro-file maps to macro input and takes non-fatal precedence over --scenario', () => {
+  const mapped = mapPtkScanArgs(['http://app.test', '--macro-file', 'login.zst', '--macro-format', 'zest']);
+  assert.equal(mapped.cliOptions.macroFile, 'login.zst');
+  assert.equal(mapped.cliOptions.macroFormat, 'zest');
+  assert.ok(mapped.compatibilitySummary.cliOverrides.includes('scenario.file'));
+  assert.ok(mapped.compatibilitySummary.cliOverrides.includes('scenario.inputType'));
+  const combined = mapPtkScanArgs(['http://app.test', '--scenario', 'scenario.md', '--macro-file', 'login.zst']);
+  assert.equal(combined.cliOptions.scenario, 'scenario.md');
+  assert.equal(combined.cliOptions.macroFile, 'login.zst');
+  assert.throws(
+    () => mapPtkScanArgs(['http://app.test', '--macro-format', 'zest']),
+    /requires --macro-file/
+  );
+});
+
+test('macro, scenario, and Agent conflict emits notices, writes execution plan, and exits successfully', async () => {
+  const dir = tmpDir('ptk-scan-macro-precedence-');
+  const { io, chunks } = createIo();
+  const exitCode = await run([
+    'http://app.test',
+    '--scenario', 'scenario.md',
+    '--macro-file', 'journey.zst',
+    '--agent-mode', 'provider',
+    '--output-dir', dir,
+    '--dry-run'
+  ], {
+    cliName: 'ptk-scan',
+    cwd: repoRoot,
+    io
+  });
+
+  assert.equal(exitCode, 0, chunks.stderr);
+  assert.match(chunks.stderr, /macro_precedence_scenario_skipped/);
+  assert.match(chunks.stderr, /macro_precedence_agent_skipped/);
+  assert.match(chunks.stderr, /Effective journey: macro/);
+
+  const plan = readJson(path.join(dir, 'execution-plan.json'));
+  assert.equal(plan.effective.journey, 'macro');
+  assert.equal(plan.effective.crawlerExecuted, false);
+  assert.equal(plan.effective.agentExecuted, false);
+  assert.deepEqual(plan.notices.map(notice => notice.code), [
+    'macro_precedence_scenario_skipped',
+    'macro_precedence_agent_skipped'
+  ]);
+
+  const compatibility = readJson(path.join(dir, 'compatibility-summary.json'));
+  assert.deepEqual(compatibility.warnings.map(warning => warning.code), [
+    'macro_precedence_scenario_skipped',
+    'macro_precedence_agent_skipped'
+  ]);
 });
 
 test('--max-routes overrides config maxRoutes and positional URL overrides config target.baseUrl', async () => {

@@ -1,0 +1,62 @@
+{
+  "version": "ptk-agent-v2-config",
+  "target": {
+    "baseUrl": "http://localhost:3001",
+    "scope": {
+      "include": ["http://localhost:3001/**"],
+      "exclude": []
+    }
+  },
+  "crawler": {
+    "enabled": false
+  },
+  "agent": {
+    "enabled": false,
+    "mode": "off"
+  },
+  "engines": {
+    "dast": { "enabled": true, "modulePacks": ["free"] },
+    "iast": { "enabled": true, "modulePacks": ["free"] },
+    "sast": { "enabled": true, "modulePacks": ["free"] },
+    "sca": { "enabled": true, "modulePacks": [] }
+  },
+  "modules": {
+    "packs": ["free"],
+    "verifySignatures": true,
+    "allowUnsigned": false,
+    "allowNetworkDownloads": false
+  },
+  "browser": {
+    "name": "chrome",
+    "headless": false,
+    "launchTimeoutMs": 30000,
+    "viewport": {
+      "width": 1433,
+      "height": 990
+    }
+  },
+  "ptk": {
+    "enabled": true,
+    "autoDetectExtension": false,
+    "requireBridge": true,
+    "requireFindingsExport": true,
+    "allowMissing": false,
+    "exportDrainMs": 30000,
+    "drainMode": "until-complete",
+    "drainTimeoutMs": 300000,
+    "requireAttackCompletion": true,
+    "stopWaitForIdle": true,
+    "immediateAnalysis": true
+  },
+  "artifacts": {
+    "outputDir": ".ptk/artifacts",
+    "formats": ["json"]
+  },
+  "ci": {
+    "failOn": {
+      "severity": ["critical", "high"],
+      "confidence": ["confirmed", "high"]
+    },
+    "noFail": true
+  }
+}

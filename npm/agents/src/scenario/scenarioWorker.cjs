@@ -8,6 +8,7 @@ const { gotoRoute } = require('../crawl/routeWorker.cjs');
 const { observePage } = require('../browser/eventCollector.cjs');
 const { extractPageModel, normalizeUrl } = require('../browser/pageModel.cjs');
 const { dismissCommonOverlays } = require('../browser/recovery.cjs');
+const { assertNavigationAllowed } = require('../browser/scopeGuard.cjs');
 const { validateTransition } = require('../browser/transition.cjs');
 const {
   budgetedScenarioConfig,
@@ -129,7 +130,20 @@ function redactScenarioValue(value, options = {}, key = '', seen = new WeakSet()
 }
 
 function scenarioSecrets(context = {}) {
-  return Array.from(collectKnownSecrets(context.profile || context.config && context.config.profile || {}));
+  const values = collectKnownSecrets(context.profile || context.config && context.config.profile || {});
+  const runtime = context.macroRuntime || {};
+  for (const value of Object.values(runtime.secrets || {})) {
+    if (typeof value === 'string' && value) values.add(value);
+  }
+  // Literal macro values remain literal for replay. Treat them as sensitive
+  // only at the result/log boundary so an imported credential is never echoed
+  // by Agent output, without changing or prompting for the value itself.
+  for (const step of runtime.flow && Array.isArray(runtime.flow.steps) ? runtime.flow.steps : []) {
+    if (step?.data?.kind === 'literal' && typeof step.data.value === 'string' && step.data.value) {
+      values.add(step.data.value);
+    }
+  }
+  return Array.from(values);
 }
 
 function contextFromInput(input = {}) {
@@ -288,13 +302,349 @@ function ensureScenarioRuntime(context = {}) {
   return context;
 }
 
+function macroStepFromScenario(step, context = {}) {
+  const stepId = step.metadata && step.metadata.macroStepId;
+  const source = context.macroRuntime && context.macroRuntime.stepsById;
+  const macroStep = source && typeof source.get === 'function' ? source.get(stepId) : null;
+  if (!macroStep) throw new Error(`Macro runtime step ${stepId || 'unknown'} is unavailable.`);
+  return macroStep;
+}
+
+function macroDataValue(data, context = {}) {
+  if (!data) return '';
+  if (data.kind === 'literal') return String(data.value || '');
+  const bucket = data.kind === 'secret'
+    ? context.macroRuntime && context.macroRuntime.secrets
+    : context.macroRuntime && context.macroRuntime.variables;
+  if (!bucket || !Object.prototype.hasOwnProperty.call(bucket, data.name)) {
+    const envName = `PTK_MACRO_${data.kind === 'secret' ? 'SECRET' : 'VAR'}_${data.name}`;
+    throw new Error(`Macro runtime value ${envName} is required.`);
+  }
+  return String(bucket[data.name]);
+}
+
+const PLAYWRIGHT_MACRO_KEYS = Object.freeze({
+  KEY_ENTER: 'Enter',
+  KEY_TAB: 'Tab',
+  KEY_BACKSPACE: 'Backspace',
+  KEY_DELETE: 'Delete',
+  KEY_ESCAPE: 'Escape',
+  KEY_ESC: 'Escape',
+  KEY_ARROW_LEFT: 'ArrowLeft',
+  KEY_ARROW_RIGHT: 'ArrowRight',
+  KEY_ARROW_UP: 'ArrowUp',
+  KEY_ARROW_DOWN: 'ArrowDown'
+});
+
+function playwrightMacroKeyValue(value) {
+  const raw = String(value || '').trim();
+  const tokenMatch = /^\$\{([^}]+)\}$/.exec(raw);
+  const token = String(tokenMatch ? tokenMatch[1] : raw).toUpperCase();
+  if (PLAYWRIGHT_MACRO_KEYS[token]) return PLAYWRIGHT_MACRO_KEYS[token];
+  if (tokenMatch || token.startsWith('KEY_')) {
+    throw new Error(`Unsupported macro key token ${raw}.`);
+  }
+  return raw;
+}
+
+function macroLocator(root, locator) {
+  const value = String(locator && locator.value || '');
+  switch (locator && locator.type) {
+    case 'xpath': return root.locator(`xpath=${value}`);
+    case 'id': return root.locator(`[id=${JSON.stringify(value)}]`);
+    case 'name': return root.locator(`[name=${JSON.stringify(value)}]`);
+    case 'className': return root.locator(`[class~=${JSON.stringify(value)}]`);
+    case 'linkText': return root.getByRole('link', { name: value, exact: true });
+    case 'aria': return root.getByText(value, { exact: true });
+    case 'text': return root.getByText(value, { exact: true });
+    case 'pierce':
+    case 'css':
+    default: return root.locator(value);
+  }
+}
+
+async function firstMacroLocator(root, locators = [], timeoutMs = 5000) {
+  if (!locators.length) throw new Error('Macro step requires an element locator.');
+  const deadline = Date.now() + timeoutMs;
+  let firstValid = null;
+  do {
+    for (const candidate of locators) {
+      let locator;
+      try {
+        locator = macroLocator(root, candidate).first();
+        const count = await locator.count().catch(() => 0);
+        if (!firstValid && count) firstValid = locator;
+        if (count && typeof locator.isVisible !== 'function') return locator;
+        if (await locator.isVisible().catch(() => false)) return locator;
+      } catch (_) {
+        // Keep trying producer alternatives. Some formats retain selectors
+        // which are legal only in their own playback engine.
+      }
+    }
+    if (Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 100));
+  } while (Date.now() < deadline);
+  if (firstValid) return firstValid;
+  const fallback = macroLocator(root, locators[0]).first();
+  await fallback.waitFor({ state: 'visible', timeout: Math.max(1, deadline - Date.now()) });
+  return fallback;
+}
+
+async function macroFrameRoot(page, frameChain = [], timeoutMs = 5000) {
+  let root = page;
+  for (const frame of frameChain) {
+    const locator = await firstMacroLocator(root, frame.locators || [], timeoutMs);
+    const handle = await locator.elementHandle({ timeout: timeoutMs });
+    const child = handle && await handle.contentFrame();
+    if (!child) throw new Error('Macro frame locator did not resolve to a child frame.');
+    root = child;
+  }
+  return root;
+}
+
+async function clickMacroLocator(locator, timeoutMs) {
+  let targetOwnsPoint = true;
+  if (locator && typeof locator.evaluate === 'function') {
+    targetOwnsPoint = await locator.evaluate(element => {
+      const target = element.closest && element.closest('button,a,input,textarea,select,[role="button"]') || element;
+      const rect = target.getBoundingClientRect();
+      const root = target.getRootNode && target.getRootNode();
+      const hit = root && typeof root.elementFromPoint === 'function'
+        ? root.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)
+        : target.ownerDocument.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+      return Boolean(hit && (hit === target || target.contains(hit) || hit.contains(target) || root && root.host === hit));
+    }).catch(() => true);
+  }
+  if (targetOwnsPoint) {
+    try {
+      await locator.click({ timeout: Math.max(250, Math.min(2000, timeoutMs - 250)) });
+      return;
+    } catch (error) {
+      if (!locator || typeof locator.evaluate !== 'function') throw error;
+    }
+  }
+  await locator.evaluate(element => {
+    const target = element.closest && element.closest('button,a,input,textarea,select,[role="button"]') || element;
+    if (typeof target.click !== 'function') throw new Error('Macro click target is not clickable.');
+    target.click();
+  });
+}
+
+async function fillMacroLocator(locator, value, timeoutMs) {
+  try {
+    await locator.fill(value, { timeout: Math.max(250, Math.min(2000, timeoutMs - 250)) });
+    return;
+  } catch (error) {
+    if (!locator || typeof locator.evaluate !== 'function') throw error;
+  }
+  await locator.evaluate((element, nextValue) => {
+    const prototype = element instanceof HTMLInputElement
+      ? HTMLInputElement.prototype
+      : element instanceof HTMLTextAreaElement
+        ? HTMLTextAreaElement.prototype
+        : element instanceof HTMLSelectElement
+          ? HTMLSelectElement.prototype
+          : null;
+    const setter = prototype && Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+    if (setter) setter.call(element, String(nextValue));
+    else element.value = String(nextValue);
+    element.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true, composed: true }));
+  }, value);
+}
+
+async function submitMacroLocator(locator) {
+  await locator.evaluate(element => {
+    const form = element instanceof HTMLFormElement ? element : element.form || element.closest && element.closest('form');
+    if (form) {
+      if (typeof form.requestSubmit === 'function') form.requestSubmit();
+      else form.submit();
+      return;
+    }
+    element.focus && element.focus({ preventScroll: true });
+    for (const type of ['keydown', 'keypress', 'keyup']) {
+      element.dispatchEvent(new KeyboardEvent(type, {
+        key: 'Enter', code: 'Enter', keyCode: 13, which: 13,
+        bubbles: true, cancelable: true, composed: true
+      }));
+    }
+  });
+}
+
+function macroPageOriginAllowed(page, context = {}) {
+  const runtime = context.macroRuntime || {};
+  let parsed;
+  try {
+    parsed = new URL(String(page && page.url ? page.url() : ''));
+  } catch (_) {
+    return false;
+  }
+  return ['http:', 'https:'].includes(parsed.protocol) && parsed.origin === runtime.targetOrigin;
+}
+
+async function selectMacroWindow(macroStep, context = {}) {
+  const current = context.page;
+  const browserContext = current && typeof current.context === 'function' ? current.context() : null;
+  const pages = browserContext && typeof browserContext.pages === 'function' ? browserContext.pages() : [current];
+  const candidates = (pages || []).filter(Boolean).filter(page => macroPageOriginAllowed(page, context));
+  const targets = [...new Set([
+    macroStep.target,
+    ...(macroStep.targetOptions || []),
+    macroStep.window && macroStep.window.handle ? `handle=${macroStep.window.handle}` : null,
+    Number.isInteger(macroStep.window && macroStep.window.index) ? `index=${macroStep.window.index}` : null
+  ].filter(Boolean))];
+  let selected = null;
+  for (const target of targets) {
+    if (String(target).startsWith('index=')) {
+      const index = Number(String(target).slice(6));
+      selected = candidates[index] || null;
+    } else if (String(target).startsWith('title=')) {
+      const title = String(target).slice(6);
+      for (const page of candidates) {
+        if (await page.title().catch(() => '') === title) {
+          selected = page;
+          break;
+        }
+      }
+    } else if (String(target).startsWith('handle=')) {
+      selected = context.macroRuntime.windowHandles && context.macroRuntime.windowHandles.get(String(target).slice(7)) || null;
+    }
+    if (selected) break;
+  }
+  if (!selected) throw new Error('Macro window target was not found in the exact target origin.');
+  context.page = selected;
+  if (!context.macroRuntime.windowHandles) context.macroRuntime.windowHandles = new Map();
+  if (macroStep.window && macroStep.window.handle) {
+    context.macroRuntime.windowHandles.set(macroStep.window.handle, selected);
+  }
+  if (typeof selected.bringToFront === 'function') await selected.bringToFront();
+  return selected;
+}
+
+async function pageForMacroStep(macroStep, context = {}) {
+  if (macroStep.type === 'selectWindow') return context.page;
+  const handle = macroStep.window && macroStep.window.handle;
+  if (handle && context.macroRuntime.windowHandles && context.macroRuntime.windowHandles.has(handle)) {
+    context.page = context.macroRuntime.windowHandles.get(handle);
+  } else if (Number(macroStep.window && macroStep.window.index) > 0) {
+    const pages = context.page.context().pages().filter(page => macroPageOriginAllowed(page, context));
+    const candidate = pages[Number(macroStep.window.index)];
+    if (candidate) context.page = candidate;
+  }
+  if (!macroPageOriginAllowed(context.page, context)) {
+    throw new Error('Macro replay refused a page outside the exact target origin.');
+  }
+  return context.page;
+}
+
+function initialMacroDestinationMatchesCurrent(currentUrl, rawUrl) {
+  try {
+    const expected = new URL(String(rawUrl || ''), String(currentUrl || ''));
+    const current = new URL(String(currentUrl || ''));
+    if (expected.href === current.href) return true;
+    const rootHashes = new Set(['', '#', '#/', '#/?']);
+    return expected.origin === current.origin
+      && expected.pathname === current.pathname
+      && expected.search === current.search
+      && rootHashes.has(expected.hash)
+      && rootHashes.has(current.hash);
+  } catch (_) {
+    return false;
+  }
+}
+
+async function executeMacroStep(step, context = {}) {
+  const macroStep = macroStepFromScenario(step, context);
+  let page = await pageForMacroStep(macroStep, context);
+  const timeoutMs = Math.max(1, Math.min(60000, Number(macroStep.timeoutMs || step.timeoutMs || 5000)));
+  const value = macroDataValue(macroStep.data, context);
+  let root;
+  let locator;
+  if (macroStep.type === 'navigate') {
+    assertNavigationAllowed(macroStep.url, { config: context.config, kind: 'macro navigation' });
+    if (new URL(macroStep.url).origin !== context.macroRuntime.targetOrigin) throw new Error('Macro navigation left the exact target origin.');
+    if (!initialMacroDestinationMatchesCurrent(page.url(), macroStep.url)) {
+      await page.goto(macroStep.url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+    }
+  } else if (macroStep.type === 'waitForNavigation') {
+    assertNavigationAllowed(macroStep.url, { config: context.config, kind: 'macro navigation wait' });
+    await page.waitForURL(macroStep.url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
+  } else if (macroStep.type === 'delay') {
+    await page.waitForTimeout(Math.min(60000, Number(macroStep.durationMs || 0)));
+  } else if (macroStep.type === 'setWindowSize') {
+    await page.setViewportSize({ width: macroStep.width, height: macroStep.height });
+  } else if (macroStep.type === 'selectWindow') {
+    page = await selectMacroWindow(macroStep, context);
+  } else if (macroStep.type === 'assertUrl') {
+    if (!String(page.url()).includes(String(macroStep.expected || ''))) throw new Error('Macro URL assertion failed.');
+  } else if (macroStep.type === 'click' && macroStep.source && macroStep.source.preparatory === true) {
+    // Recorder-generated focus assistance is represented for round-trip
+    // fidelity, but the following fill owns the actual input operation.
+  } else if (macroStep.type !== 'comment') {
+    root = await macroFrameRoot(page, macroStep.frameChain || [], timeoutMs);
+    if (macroStep.type === 'scroll' && !(macroStep.locators || []).length) {
+      const mode = ['intoView', 'to', 'by'].includes(macroStep.scrollMode) ? macroStep.scrollMode : 'to';
+      if (mode !== 'to') throw new Error(`Macro ${mode} scrolling requires an element locator.`);
+      await page.evaluate(({ x, y }) => window.scrollTo(x, y), {
+        x: Number.isInteger(macroStep.x) ? macroStep.x : 0,
+        y: Number.isInteger(macroStep.y) ? macroStep.y : 0
+      });
+    } else {
+      locator = await firstMacroLocator(root, macroStep.locators || [], timeoutMs);
+      if (macroStep.type === 'click') await clickMacroLocator(locator, timeoutMs);
+      else if (macroStep.type === 'doubleClick') await locator.dblclick({ timeout: timeoutMs });
+      else if (macroStep.type === 'fill') await fillMacroLocator(locator, value, timeoutMs);
+      else if (macroStep.type === 'select') await locator.selectOption(value, { timeout: timeoutMs });
+      else if (macroStep.type === 'submit') await submitMacroLocator(locator);
+      else if (macroStep.type === 'keyPress') await locator.press(playwrightMacroKeyValue(value), { timeout: timeoutMs });
+      else if (macroStep.type === 'scroll') {
+        const mode = ['intoView', 'to', 'by'].includes(macroStep.scrollMode)
+          ? macroStep.scrollMode
+          : 'intoView';
+        if (mode === 'intoView') {
+          await locator.scrollIntoViewIfNeeded({ timeout: timeoutMs });
+        } else {
+          await locator.evaluate((element, coordinates) => {
+            if (coordinates.mode === 'by') {
+              if (typeof element.scrollBy === 'function') element.scrollBy(coordinates.x, coordinates.y);
+              else {
+                element.scrollLeft += coordinates.x;
+                element.scrollTop += coordinates.y;
+              }
+            } else if (typeof element.scrollTo === 'function') {
+              element.scrollTo(coordinates.x, coordinates.y);
+            } else {
+              element.scrollLeft = coordinates.x;
+              element.scrollTop = coordinates.y;
+            }
+          }, {
+            mode,
+            x: Number.isInteger(macroStep.x) ? macroStep.x : 0,
+            y: Number.isInteger(macroStep.y) ? macroStep.y : 0
+          });
+        }
+      }
+      else if (macroStep.type === 'hover') await locator.hover({ timeout: timeoutMs });
+      else if (macroStep.type === 'waitForElement') await locator.waitFor({ state: 'visible', timeout: timeoutMs });
+      else if (macroStep.type === 'assertElement') await locator.waitFor({ state: 'visible', timeout: timeoutMs });
+      else if (macroStep.type === 'assertText') {
+        const actual = await locator.innerText({ timeout: timeoutMs });
+        if (!String(actual).includes(String(macroStep.expected || ''))) throw new Error('Macro text assertion failed.');
+      } else throw new Error(`Unsupported macro step ${macroStep.type}.`);
+    }
+  }
+  if (macroStep.type !== 'delay' && Number(macroStep.durationMs || 0) > 0) {
+    await page.waitForTimeout(Math.min(60000, Number(macroStep.durationMs)));
+  }
+  return { ok: true, completed: true, action: macroStep.type, url: page && page.url ? page.url() : null };
+}
+
 function createBrowserScenarioHandlers(defaultContext = {}) {
   ensureScenarioRuntime(defaultContext);
   const bind = executor => async (step, context = {}) => {
     const runtime = context === defaultContext ? context : Object.assign(defaultContext, context);
     return executor(step, ensureScenarioRuntime(runtime));
   };
-  return {
+  const handlers = {
     auth: bind(executeAuthStep),
     navigate: bind(executeNavigateStep),
     search: bind((step, context) => workflowSearch(step, context).catch(() => executeSearchStep(step, context))),
@@ -307,6 +657,14 @@ function createBrowserScenarioHandlers(defaultContext = {}) {
     'submit-form': bind(executeSubmitFormStep),
     'assert-state': bind(executeAssertStateStep)
   };
+  for (const type of [
+    'navigate', 'click', 'doubleClick', 'fill', 'select', 'submit', 'keyPress', 'scroll', 'hover',
+    'waitForElement', 'waitForNavigation', 'delay', 'setWindowSize', 'selectWindow',
+    'assertText', 'assertUrl', 'assertElement', 'comment'
+  ]) {
+    handlers[`macro-${type}`] = bind(executeMacroStep);
+  }
+  return handlers;
 }
 
 function compactPageModel(pageModel = {}) {
@@ -1042,6 +1400,12 @@ module.exports = {
   executeStepWithRetry,
   executeAuthStep,
   executeNavigateStep,
+  executeMacroStep,
+  clickMacroLocator,
+  fillMacroLocator,
+  playwrightMacroKeyValue,
+  initialMacroDestinationMatchesCurrent,
+  submitMacroLocator,
   executeSearchStep,
   executeSubmitFormStep,
   executeAssertStateStep,

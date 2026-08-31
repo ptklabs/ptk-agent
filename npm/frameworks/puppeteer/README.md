@@ -1,6 +1,8 @@
 # PTK Puppeteer SDK (Experimental)
 
-This SDK is an experimental Puppeteer integration for PTK browser-extension automation.
+This SDK is an experimental Puppeteer integration for PTK browser-extension
+automation. `pentestkit` does not install Puppeteer or download its browser;
+the project selecting this integration owns that dependency.
 
 Install either Puppeteer package in the project that runs the test:
 
@@ -8,11 +10,22 @@ Install either Puppeteer package in the project that runs the test:
 npm install -D pentestkit puppeteer
 ```
 
-or, when you provide a Chrome/Chromium executable yourself:
+or, when you provide Chrome for Testing or another compatible Chromium
+executable that permits local extension loading:
 
 ```bash
 npm install -D pentestkit puppeteer-core
 ```
+
+Installing `puppeteer` may download Puppeteer's managed browser because the
+user explicitly selected that package; PTK does not start that installation or
+download. Current branded Chrome may reject command-line loading of an
+unpacked extension, so Chrome for Testing is the recommended local target for
+`puppeteer-core`.
+
+Importing the adapter does not require either optional package. PTK resolves
+the implementation only when a Puppeteer browser/session is requested and
+reports a clear installation error when neither is available.
 
 Use the public package import:
 

@@ -12,7 +12,10 @@ Install the package:
 npm install -D pentestkit
 ```
 
-Some providers also require their official SDK, as shown below.
+Some providers also require their official SDK, as shown below. The table's
+“Additional package” column lists provider SDKs only. If you select a
+Puppeteer connector, install `puppeteer` or `puppeteer-core` explicitly;
+`pentestkit` never installs either package automatically.
 
 Set an explicitly authorised target for the packaged examples:
 

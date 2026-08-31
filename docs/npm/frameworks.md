@@ -172,18 +172,32 @@ See `frameworks/cypress/README.md` and `frameworks/cypress/examples/` in the ins
 
 ## Puppeteer (Experimental)
 
-The Puppeteer integration is optional and experimental. Install Puppeteer in the project that runs the test:
+The Puppeteer integration is optional and experimental. `pentestkit` does not
+install a Puppeteer implementation or download a Puppeteer-managed browser.
+Install Puppeteer explicitly in the project that runs the test:
 
 ```bash
 npm install -D pentestkit puppeteer
 ```
 
-or use `puppeteer-core` with an explicit browser executable:
+or use `puppeteer-core` with Chrome for Testing or another compatible Chromium
+executable that permits local extension loading:
 
 ```bash
 npm install -D pentestkit puppeteer-core
 export PTK_PUPPETEER_EXECUTABLE_PATH=/path/to/chrome
 ```
+
+Installing `puppeteer` may download the browser version managed by Puppeteer;
+that happens only because the user selected and installed Puppeteer. PTK does
+not trigger that installation or browser download. Current branded Chrome may
+reject command-line loading of an unpacked extension, so Chrome for Testing is
+the recommended local automation target when using `puppeteer-core`.
+
+Importing `pentestkit` or `pentestkit/puppeteer` remains safe without either
+package. PTK resolves the optional dependency only when a Puppeteer session is
+started and then reports the required installation command if neither package
+is available.
 
 Basic usage:
 

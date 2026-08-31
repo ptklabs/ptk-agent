@@ -124,7 +124,12 @@ fi
 # which avoids launching the same persistent profile twice.
 if [[ "$BROWSER" == "firefox" ]]; then
   mkdir -p "$PROFILE_DIR/extensions"
-  cp "$FIREFOX_XPI" "$PROFILE_DIR/extensions/pentestkit@DenisPodgurskii.xpi"
+  FIREFOX_ADDON_ID="$(unzip -p "$FIREFOX_XPI" manifest.json | "$PYTHON_BIN" -c 'import json, sys; print(json.load(sys.stdin).get("browser_specific_settings", {}).get("gecko", {}).get("id", ""))')"
+  if [[ -z "$FIREFOX_ADDON_ID" || "$FIREFOX_ADDON_ID" == */* ]]; then
+    echo "unable to resolve Firefox add-on ID from $FIREFOX_XPI" >&2
+    exit 1
+  fi
+  cp "$FIREFOX_XPI" "$PROFILE_DIR/extensions/$FIREFOX_ADDON_ID.xpi"
   cat >"$PROFILE_DIR/user.js" <<EOF
 user_pref("extensions.autoDisableScopes", 0);
 user_pref("extensions.enabledScopes", 15);

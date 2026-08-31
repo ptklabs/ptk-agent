@@ -916,13 +916,17 @@ function writePackageJson(stageRoot, version, options = {}) {
   });
   const peerDependencies = {
     cypress: '>=12.0.0',
-    puppeteer: '>=22.0.0'
+    puppeteer: '>=22.0.0',
+    'puppeteer-core': '>=22.0.0'
   };
   const peerDependenciesMeta = {
     cypress: {
       optional: true
     },
     puppeteer: {
+      optional: true
+    },
+    'puppeteer-core': {
       optional: true
     }
   };
@@ -960,7 +964,6 @@ function writePackageJson(stageRoot, version, options = {}) {
     files: PACKAGE_FILE_ALLOWLIST,
     dependencies: {
       playwright: '^1.58.1',
-      'puppeteer-core': '24.10.0',
       'selenium-webdriver': '4.26.0'
     },
     peerDependencies,
@@ -1235,6 +1238,14 @@ function verifyStagedPackage(stageRoot) {
 
 function verifyPackageJson(stageRoot) {
   const packageJson = readJson(path.join(stageRoot, 'package.json'));
+  for (const name of ['puppeteer', 'puppeteer-core']) {
+    if (packageJson.dependencies?.[name] || packageJson.optionalDependencies?.[name]) {
+      throw new Error(`Generated package must not install optional Puppeteer dependency ${name}`);
+    }
+    if (!packageJson.peerDependencies?.[name] || packageJson.peerDependenciesMeta?.[name]?.optional !== true) {
+      throw new Error(`Generated package must declare ${name} as an optional peer dependency`);
+    }
+  }
   const scripts = packageJson.scripts || {};
   const forbiddenScripts = Object.keys(scripts).filter((name) => FORBIDDEN_LIFECYCLE_SCRIPTS.has(name));
   if (forbiddenScripts.length) {

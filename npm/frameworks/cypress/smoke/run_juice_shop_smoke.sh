@@ -57,7 +57,7 @@ resolve_chrome_for_testing_binary() {
     printf '%s\n' "$PTK_CHROME_BINARY"
     return 0
   fi
-  "$NODE_BIN" -e 'try { const p = require("playwright").chromium.executablePath(); if (p) console.log(p); } catch (_) {}'
+  "$NODE_BIN" -e 'const path=require("path"); const {createRequire}=require("module"); const root=process.argv[1]; try { const load=root ? createRequire(path.join(root,"package.json")) : require; const p=load("playwright").chromium.executablePath(); if (p) console.log(p); } catch (_) {}' "${PTK_PACKAGE_ROOT:-}"
 }
 
 if [[ "$MODE" == "package" ]]; then
@@ -95,6 +95,12 @@ if [[ "$BROWSER" == "chrome-for-testing" ]]; then
   if CHROME_FOR_TESTING_BINARY="$(resolve_chrome_for_testing_binary)" && [[ -n "$CHROME_FOR_TESTING_BINARY" && -x "$CHROME_FOR_TESTING_BINARY" ]]; then
     CYPRESS_BROWSER="$CHROME_FOR_TESTING_BINARY"
     echo "Chrome for Testing: $CYPRESS_BROWSER"
+  fi
+elif [[ "$BROWSER" == "firefox" ]]; then
+  FIREFOX_BINARY="${PTK_CYPRESS_FIREFOX_BINARY:-${PTK_FIREFOX_BINARY:-}}"
+  if [[ -n "$FIREFOX_BINARY" && -x "$FIREFOX_BINARY" ]]; then
+    CYPRESS_BROWSER="$FIREFOX_BINARY"
+    echo "Firefox executable: $CYPRESS_BROWSER"
   fi
 fi
 

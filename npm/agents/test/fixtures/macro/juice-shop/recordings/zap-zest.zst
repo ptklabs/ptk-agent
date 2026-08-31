@@ -1,0 +1,422 @@
+{
+  "about": "This is a Zest script. For more details about Zest visit https://github.com/zaproxy/zest/",
+  "zestVersion": "0.3",
+  "title": "juice-shop-visible-journey",
+  "description": "",
+  "prefix": "",
+  "type": "StandAlone",
+  "parameters": {
+    "tokenStart": "{{",
+    "tokenEnd": "}}",
+    "tokens": {},
+    "elementType": "ZestVariables"
+  },
+  "statements": [
+    {
+      "index": 1,
+      "enabled": true,
+      "elementType": "ZestComment",
+      "comment": "Recorded by ZAP by Checkmarx Recorder 0.2.3 on Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "browserType": "chrome",
+      "url": "http://localhost:3001/#/",
+      "capabilities": "",
+      "headless": false,
+      "index": 2,
+      "enabled": true,
+      "elementType": "ZestClientLaunch"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/div[4]/div[2]/div/mat-dialog-container/div/div/app-welcome-banner/div[2]/button[2]/span[2]/span",
+      "index": 3,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/div[4]/div[2]/div/mat-dialog-container/div/div/app-welcome-banner/div[2]/button[2]/span[2]/span",
+      "index": 4,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "ptkOptional": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "cssSelector",
+      "element": "body > div > div > a",
+      "index": 5,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "cssSelector",
+      "element": "body > div > div > a",
+      "index": 6,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "ptkOptional": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/button[3]/span[2]/span",
+      "index": 7,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/button[3]/span[2]/span",
+      "index": 8,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "cssSelector",
+      "element": "body > div > div > div > div > div > button > span > span",
+      "index": 9,
+      "waitForMsec": 10000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "cssSelector",
+      "element": "body > div > div > div > div > div > button > span > span",
+      "index": 10,
+      "waitForMsec": 10000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "email",
+      "index": 11,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "email",
+      "index": 12,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "email",
+      "index": 13,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "value": "ptk@test.com",
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "email",
+      "index": 14,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementSendKeys"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "password",
+      "index": 15,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "password",
+      "index": 16,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "password",
+      "index": 17,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "value": "P@ssword",
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "password",
+      "index": 18,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementSendKeys"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-login/div/mat-card/div/div/button/span[2]",
+      "index": 19,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-login/div/mat-card/div/div/button/span[2]",
+      "index": 20,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/button[3]/span[2]/span",
+      "index": 21,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/button[3]/span[2]/span",
+      "index": 22,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/div[4]/div[2]/div/div/div/button[1]/span/span",
+      "index": 23,
+      "waitForMsec": 10000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/div[4]/div[2]/div/div/div/button[1]/span/span",
+      "index": 24,
+      "waitForMsec": 10000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "className",
+      "element": "material-icons",
+      "index": 25,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "className",
+      "element": "material-icons",
+      "index": 26,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-search-result/div/div/div[2]/mat-grid-list/div/mat-grid-tile[1]/div/mat-card/div/div[2]/button/span[2]/span",
+      "index": 27,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-search-result/div/div/div[2]/mat-grid-list/div/mat-grid-tile[1]/div/mat-card/div/div[2]/button/span[2]/span",
+      "index": 28,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-search-result/div/div/div[2]/mat-grid-list/div/mat-grid-tile[2]/div/mat-card/div/div[2]/button/span[2]/span",
+      "index": 29,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-search-result/div/div/div[2]/mat-grid-list/div/mat-grid-tile[2]/div/mat-card/div/div[2]/button/span[2]/span",
+      "index": 30,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/button[4]/span[2]/span[1]",
+      "index": 31,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/button[4]/span[2]/span[1]",
+      "index": 32,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-basket/mat-card/div/app-purchase-basket/mat-table/mat-row[1]/mat-cell[5]/button/span[3]",
+      "index": 33,
+      "waitForMsec": 10000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-basket/mat-card/div/app-purchase-basket/mat-table/mat-row[1]/mat-cell[5]/button/span[3]",
+      "index": 34,
+      "waitForMsec": 10000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "className",
+      "element": "hide-lt-sm",
+      "index": 35,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "className",
+      "element": "hide-lt-sm",
+      "index": 36,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/app-mat-search-bar/span/mat-icon[2]",
+      "index": 37,
+      "waitForMsec": 10000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "xpath",
+      "element": "/html/body/app-root/mat-sidenav-container/mat-sidenav-content/app-navbar/mat-toolbar/mat-toolbar-row/app-mat-search-bar/span/mat-icon[2]",
+      "index": 38,
+      "waitForMsec": 10000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "mat-input-1",
+      "index": 39,
+      "waitForMsec": 10000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "mat-input-1",
+      "index": 40,
+      "waitForMsec": 10000,
+      "enabled": true,
+      "elementType": "ZestClientElementClick"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "mat-input-1",
+      "index": 41,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "value": "test",
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "mat-input-1",
+      "index": 42,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementSendKeys"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "mat-input-1",
+      "index": 43,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementScrollTo"
+    },
+    {
+      "windowHandle": "windowHandle1",
+      "type": "id",
+      "element": "mat-input-1",
+      "index": 44,
+      "waitForMsec": 5000,
+      "enabled": true,
+      "elementType": "ZestClientElementSubmit"
+    }
+  ],
+  "authentication": [],
+  "index": 0,
+  "enabled": true,
+  "elementType": "ZestScript",
+  "options": {
+    "statementDelay": "1000"
+  }
+}

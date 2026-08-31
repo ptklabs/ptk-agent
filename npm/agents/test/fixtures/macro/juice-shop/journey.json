@@ -1,0 +1,115 @@
+{
+  "schema": "ptk-macro-release-journey/v1",
+  "id": "juice-shop-authenticated-profile-basket-search",
+  "name": "Authenticated profile, basket, and search journey",
+  "origin": "http://localhost:3001",
+  "account": {
+    "classification": "public-local-demo",
+    "email": "ptk@test.com"
+  },
+  "statePreparation": {
+    "createAccountIfMissing": true,
+    "clearCookiesAndBrowserStorage": true,
+    "clearBasketBeforeRecording": true
+  },
+  "inputs": {
+    "searchTerm": "test"
+  },
+  "steps": [
+    {
+      "id": "home",
+      "action": "navigate",
+      "target": "http://localhost:3001/"
+    },
+    {
+      "id": "dismiss-welcome",
+      "action": "click-if-present",
+      "target": "Welcome banner close control"
+    },
+    {
+      "id": "dismiss-cookie",
+      "action": "click-if-present",
+      "target": "Cookie message dismiss control"
+    },
+    {
+      "id": "open-login",
+      "action": "click",
+      "target": "Account menu, then Login"
+    },
+    {
+      "id": "enter-email",
+      "action": "fill",
+      "target": "Email",
+      "value": "ptk@test.com"
+    },
+    {
+      "id": "enter-password",
+      "action": "fill",
+      "target": "Password",
+      "valueClassification": "public-local-demo"
+    },
+    {
+      "id": "submit-login",
+      "action": "click",
+      "target": "Login"
+    },
+    {
+      "id": "open-profile",
+      "action": "click",
+      "target": "Account menu, then Profile"
+    },
+    {
+      "id": "return-home",
+      "action": "click",
+      "target": "Juice Shop logo"
+    },
+    {
+      "id": "add-product-one",
+      "action": "click",
+      "target": "First Add to Basket control"
+    },
+    {
+      "id": "add-product-two",
+      "action": "click",
+      "target": "Second Add to Basket control"
+    },
+    {
+      "id": "open-basket",
+      "action": "click",
+      "target": "Basket control"
+    },
+    {
+      "id": "remove-product",
+      "action": "click",
+      "target": "First basket row remove control"
+    },
+    {
+      "id": "return-home-for-search",
+      "action": "click",
+      "target": "Juice Shop logo"
+    },
+    {
+      "id": "open-search",
+      "action": "click",
+      "target": "Search control"
+    },
+    {
+      "id": "search",
+      "action": "fill-and-submit",
+      "target": "Search input",
+      "value": "test"
+    }
+  ],
+  "expected": {
+    "authenticated": true,
+    "profileVisited": true,
+    "productsAdded": 2,
+    "productsRemoved": 1,
+    "searchTerm": "test",
+    "finalUrlContains": "/#/search?q=test"
+  },
+  "comparisonBaseline": {
+    "implementation": "ptk-agent/npm/frameworks/playwright/smoke/juice_shop_scan.mjs",
+    "note": "The existing smoke prepares the same account and state but uses direct navigation for Profile, Home, and Basket. Macro fixtures use visible UI controls to exercise the browser journey."
+  }
+}

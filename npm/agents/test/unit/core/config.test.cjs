@@ -48,8 +48,35 @@ test('resolveConfig returns v2 defaults with visible budgets', () => {
   assert.equal(config.ptk.immediateAnalysis, true);
   assert.equal(config.memory.mode, 'off');
   assert.equal(config.memory.storageDir, '.ptk/site-memory');
+  assert.equal(config.scenario.inputType, 'scenario');
+  assert.equal(config.scenario.format, 'auto');
   assert.equal(config._resolved.budgets.waitBudgetMs, 800);
   assert.equal(config._resolved.budgets.perRouteBudgetMs, 34800);
+});
+
+test('config and CLI select macro input without changing ordinary scenario defaults', () => {
+  const overrides = configOverridesFromCli({
+    macroFile: 'login.zst',
+    macroFormat: 'zest',
+    scenarioContinueOnFailure: true
+  });
+  const config = resolveConfig({
+    overrides,
+    config: {
+      target: {
+        baseUrl: 'http://localhost:3001',
+        scope: { include: ['http://localhost:3001/**'], exclude: [] }
+      }
+    }
+  });
+  assert.equal(config.scenario.enabled, true);
+  assert.equal(config.scenario.file, 'login.zst');
+  assert.equal(config.scenario.inputType, 'macro');
+  assert.equal(config.scenario.format, 'zest');
+  assert.equal(config.scenario.continueOnFailure, true);
+  assert.throws(() => resolveConfig({
+    config: { scenario: { enabled: true, file: 'login.js', inputType: 'macro', format: 'playwright' } }
+  }), ConfigValidationError);
 });
 
 test('resolveConfig merges a config file and normalizes numeric budgets', () => {

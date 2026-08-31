@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const { parseArgs, UsageError } = require('../args.cjs');
-const { EXIT_OK, printResult, printRunResult, writeLine } = require('../status.cjs');
+const { EXIT_OK, printExecutionPlanNotices, printResult, printRunResult, writeLine } = require('../status.cjs');
 const { runPtkAgent } = require('../../core/runner.cjs');
 const { ARTIFACT_FILENAMES, ensureDir, stableJson, writeJson } = require('../../core/artifacts.cjs');
 const { redactSecrets } = require('../../core/config.cjs');
@@ -36,6 +36,8 @@ const STRING_FLAGS = Object.freeze([
   'password',
   'password-env',
   'scenario',
+  'macro-file',
+  'macro-format',
   'crawl-pages',
   'crawl-depth',
   'route-hints-file',
@@ -112,6 +114,9 @@ function help(cliName = 'ptk-scan') {
     '  --config <path>                 Config file path. CLI overrides win.',
     '  --engine, --engines <list>      Comma-separated DAST, IAST, SAST, SCA.',
     '  --scenario <path>               Scenario JSON/markdown path.',
+    '  --macro-file <path>             Replay only this PTK Flow, XML, Zest, Selenium IDE, or Chrome Recorder journey while scans run.',
+    '  --macro-format <id>              Macro format override; automatic detection is the default.',
+    '                                    Macro refs: ${PTK_SECRET:NAME} -> PTK_MACRO_SECRET_NAME; ${NAME} -> PTK_MACRO_VAR_NAME.',
     '  --scenario-continue-on-failure  Continue crawl after scenario setup failure.',
     '  --username <value>              Active persona username.',
     '  --username-env <name>           Read username from environment. Never artifact value.',
@@ -147,6 +152,10 @@ function help(cliName = 'ptk-scan') {
     '  --aggressive                    Allow business-tier agent mutations only.',
     '  --allow-destructive-actions     Allow destructive-tier agent actions.',
     '  --require-agent-success         Fail scan if agent execution fails.',
+    '',
+    'Journey order:',
+    '  scenario -> crawler; scenario + Agent -> crawler baseline -> Agent expansion.',
+    '  macro -> macro only; conflicting scenario/Agent inputs are skipped with a pre-browser notice.',
     '  --include-secrets               Allow browser execution to use supplied secrets; artifacts/providers stay redacted.',
     '  --browser <name>                chromium, chrome, edge, or firefox.',
     '  --chrome-binary <path>          Chrome executable path.',
@@ -277,6 +286,9 @@ function mapPtkScanArgs(argv = [], env = process.env) {
   if (positionals.length > 1) {
     throw new UsageError(`ptk-scan accepts at most one positional URL; received: ${positionals.join(', ')}`);
   }
+  if (options['macro-format'] && !options['macro-file']) {
+    throw new UsageError('--macro-format requires --macro-file.');
+  }
 
   const mappedFlags = [];
   const cliOverrides = [];
@@ -301,6 +313,9 @@ function mapPtkScanArgs(argv = [], env = process.env) {
 
   mapFlag('--config', 'config', options.config, null);
   mapFlag('--scenario', 'scenario', options.scenario, 'scenario.file');
+  mapFlag('--macro-file', 'macroFile', options['macro-file'], 'scenario.file');
+  mapFlag('--macro-format', 'macroFormat', options['macro-format'], 'scenario.format');
+  if (options['macro-file']) cliOverrides.push('scenario.inputType');
   mapFlag('--scenario-continue-on-failure', 'scenarioContinueOnFailure', options['scenario-continue-on-failure'], 'scenario.continueOnFailure');
   mapFlag('--username', 'username', options.username, 'profile.username');
   mapFlag('--password', 'password', options.password, 'profile.password');
@@ -479,6 +494,7 @@ async function run(argv = [], context = {}) {
   delete runOptions.format;
   delete runOptions.output;
   delete runOptions.failOn;
+  runOptions.onExecutionPlan = plan => printExecutionPlanNotices({ io }, plan);
   const executeRun = context.runPtkAgent || runPtkAgent;
   const result = await executeRun({
     ...runOptions,
@@ -492,6 +508,12 @@ async function run(argv = [], context = {}) {
     result.moduleResolution || null,
     result.coverage && result.coverage.ptk && result.coverage.ptk.lifecycle || null
   );
+  for (const notice of result.executionPlan && result.executionPlan.notices || []) {
+    mapped.compatibilitySummary.warnings.push({
+      code: notice.code || 'journey_precedence',
+      message: notice.message || 'The effective journey differs from the requested combination.'
+    });
+  }
   const files = writeCompatibilityArtifacts(outputDir, mapped.compatibilitySummary, engineSummary);
   result.artifacts = Object.assign({}, result.artifacts || {}, files);
 

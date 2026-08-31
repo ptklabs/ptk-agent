@@ -33,6 +33,8 @@ The runtime is deterministic first:
 - state-changing actions require explicit policy;
 - a missing PTK bridge or failed findings export is not reported as zero findings;
 - provider and browser resources are closed on completion or failure;
+- macro input is an exclusive journey; conflicting scenario/Agent inputs are
+  reported before launch, skipped, and recorded in `execution-plan.json`;
 - credentials and sensitive evidence are redacted by default.
 
 PTK Auto performs DAST, IAST, SAST, and SCA work. The Agent runtime controls browser journeys and records lifecycle evidence; it does not replace the PTK engines.
@@ -45,6 +47,7 @@ The validated configuration model covers:
 - browser and profile selection;
 - crawler and action budgets;
 - scenarios and authenticated flows;
+- structured macro journeys replayed after the selected PTK engines start;
 - PTK engine and module selection;
 - bridge, drain, stop, and export requirements;
 - output and CI severity policy;
@@ -54,7 +57,10 @@ See [configuration](../../docs/npm/configuration.md) for the supported public sc
 
 ## Scan Results
 
-Normal result files describe resolved configuration, coverage, crawl events, engine participation, PTK lifecycle, findings, and severity-gate decisions. Their exact presence depends on the selected command and output format.
+Normal result files describe resolved configuration, the requested/effective
+execution plan, coverage, crawl events, engine participation, PTK lifecycle,
+findings, and severity-gate decisions. Their exact presence depends on the
+selected command and output format.
 
 Treat results as sensitive security evidence. They can include application URLs, page observations, screenshots, traces, and—when explicitly requested—authentication or replay data. Restrict access, redact before sharing, and apply an appropriate retention policy.
 

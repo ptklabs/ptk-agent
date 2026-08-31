@@ -68,6 +68,28 @@ function redactPtkSecrets(value, key = '') {
   return value;
 }
 
+function redactPtkSecretsWithValues(value, sensitiveValues = []) {
+  const values = Array.from(new Set((sensitiveValues || [])
+    .filter(item => typeof item === 'string' && item.length > 0)))
+    .sort((left, right) => right.length - left.length);
+
+  function redact(valueToRedact, key = '') {
+    if (SECRET_KEY_PATTERN.test(String(key))) return REDACTED;
+    if (Array.isArray(valueToRedact)) return valueToRedact.map(item => redact(item));
+    if (isPlainObject(valueToRedact)) {
+      const output = {};
+      for (const [childKey, childValue] of Object.entries(valueToRedact)) output[childKey] = redact(childValue, childKey);
+      return output;
+    }
+    if (typeof valueToRedact !== 'string') return valueToRedact;
+    let output = redactSecretString(valueToRedact);
+    for (const sensitiveValue of values) output = output.split(sensitiveValue).join(REDACTED);
+    return output;
+  }
+
+  return redact(value);
+}
+
 function normalizeSeverity(value) {
   const severity = compact(value, 40).toLowerCase();
   if (!severity) return 'unknown';
@@ -440,6 +462,7 @@ module.exports = {
   PTK_FINDINGS_COUNT_ARTIFACT,
   PTK_FINDINGS_COUNT_SCHEMA_VERSION,
   redactPtkSecrets,
+  redactPtkSecretsWithValues,
   extractPtkFindings,
   normalizeFinding,
   findingFingerprint,

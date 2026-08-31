@@ -10,6 +10,11 @@ The npm package is named [`pentestkit`](https://www.npmjs.com/package/pentestkit
 npm install -D pentestkit
 ```
 
+Puppeteer is an optional integration and is not installed by `pentestkit`.
+Install `puppeteer` or `puppeteer-core` explicitly only in projects that select
+the Puppeteer framework or a provider's Puppeteer connector. See the
+[framework guide](docs/npm/frameworks.md#puppeteer-experimental).
+
 Install the Playwright browser used by the default scanner:
 
 ```bash
@@ -29,6 +34,10 @@ npx ptk-scan https://your-authorised-target.example \
 ```
 
 PTK Agent starts a browser with PTK Auto, keeps navigation within the configured target scope, runs the selected engines, and writes the scan results to the configured output directory.
+
+Recorded PTK Flow, XML/Katalon Recorder, Zest, Selenium IDE, and Chrome Recorder journeys can run concurrently with those engines through `--macro-file`. Macro mode replays only the imported journey; it does not add crawler or Agent/LLM exploration. Scenarios instead run before deterministic crawling and may be combined with a later Agent/LLM expansion phase. If macro, scenario, or Agent inputs conflict, PTK prints a pre-browser notice, uses the macro as the exclusive journey, and continues the scan. See the [execution model and scenario/macro guide](docs/npm/scenarios.md#choose-one-journey-model).
+
+Literal macro values are replayed as written. Explicit references use the PTK Agent environment convention: `${PTK_SECRET:PASSWORD}` reads `PTK_MACRO_SECRET_PASSWORD`, and `${ACCOUNT_ID}` reads `PTK_MACRO_VAR_ACCOUNT_ID`. See the [recorded-macro contract](docs/npm/scenarios.md#recorded-macro-scans) for CI examples and the separate naming used by generated framework code.
 
 To verify extension setup without starting a scan:
 

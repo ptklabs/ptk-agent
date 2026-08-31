@@ -37,7 +37,7 @@
       "id": "add-apple-to-cart",
       "type": "add-to-cart",
       "persona": "shopper",
-      "timeoutMs": 8000,
+      "timeoutMs": 15000,
       "dependsOn": ["search-apple"],
       "value": {
         "quantity": 2,

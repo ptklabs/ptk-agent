@@ -17,6 +17,54 @@ window.addEventListener('ptk-automation-ready', () => {
 
 Full navigation replaces the page context and destroys the bridge. After navigating to a new page, wait for the event again before using either object.
 
+## Macro-driven scans
+
+PTK Agent can import a PTK Flow JSON, XML macro, ZAP Zest, Selenium IDE, or
+Chrome Recorder file and execute that browser journey while DAST, IAST, SAST,
+and SCA are active:
+
+```bash
+npx ptk-scan https://your-authorised-target.example \
+  --macro-file ./login.zst \
+  --macro-format auto \
+  --engine DAST,IAST,SAST,SCA \
+  --require-ptk-bridge \
+  --require-ptk-findings-export
+```
+
+The Agent validates and normalizes the macro before starting PTK, starts the
+selected engines before the first macro action, and then uses native browser
+automation operations for replay. Explicit navigation must remain within the
+configured target scope. The extension's interactive replay confirmation is
+not shown because the Agent owns the browser journey.
+
+Macro mode is exclusive. It does not continue into crawler, form-discovery,
+scenario, or Agent/LLM exploration after replay. If `--scenario` or an enabled
+`--agent-mode` is also supplied, PTK reports the skipped phase before browser
+launch and continues with the macro as the only journey. The notice is also
+recorded in `execution-plan.json` for CI review. This precedence applies to the
+journey driver only; all selected PTK security engines can still run.
+
+Recorded-macro execution through the standalone `ptk-scan` runner currently
+supports Chromium, Chrome, and Edge. Firefox PTK Auto artifacts remain
+available to supported framework and provider integrations; the standalone
+CLI does not yet load a Firefox XPI.
+
+Imported macro values are replayed literally and are redacted from standard
+result artifacts. Explicit variable and secret references can be supplied at runtime through
+`PTK_MACRO_VAR_<NAME>` and `PTK_MACRO_SECRET_<NAME>`. See the
+[scenario guide](npm/scenarios.md#recorded-macro-scans) for formats, configuration, and
+conversion constraints.
+
+For example, `${PTK_SECRET:PASSWORD}` requires
+`PTK_MACRO_SECRET_PASSWORD`, while `${ACCOUNT_ID}` requires
+`PTK_MACRO_VAR_ACCOUNT_ID` in the process that launches `ptk-scan`. The Auto
+extension does not read operating-system environment variables directly; the
+Node.js Agent resolves and supplies them. Persona credential options such as
+`--password-env` do not implicitly fill macro references. Generated framework
+code uses the shorter `PTK_SECRET_<NAME>` and `PTK_VAR_<NAME>` convention for
+backward compatibility.
+
 ---
 
 ## PTK_AGENT Workflow API

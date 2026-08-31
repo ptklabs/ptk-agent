@@ -78,6 +78,10 @@ test('benchmark scenarios keep domain actions as concrete step types', () => {
 
   assert.equal(juiceShop.steps.find(step => step.id === 'add-apple-to-cart').type, 'add-to-cart');
   assert.notEqual(juiceShop.steps.find(step => step.id === 'add-apple-to-cart').type, 'submit-form');
+  assert.ok(
+    juiceShop.steps.find(step => step.id === 'add-apple-to-cart').timeoutMs >= 15000,
+    'the two-item cart workflow must allow time for click observations while PTK engines are active'
+  );
   assert.equal(testfire.steps.find(step => step.id === 'transfer-funds').type, 'transfer-funds');
   assert.notEqual(testfire.steps.find(step => step.id === 'transfer-funds').type, 'submit-form');
   assert.equal(brokencrystals.steps.find(step => step.id === 'open-swagger').type, 'navigate');
